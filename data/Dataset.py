@@ -52,7 +52,7 @@ class DataBuilder(data.Dataset):
             else:
                 class_tuple = row_tuple[self.labels_class_columns].values.flatten().tolist()
             class_tuple_np = np.asarray(class_tuple, dtype=np.float64)
-            return continuous_tuples_np, num_int_tuples_np, bin_tuples_np, cat_tuples, class_tuple
+            return continuous_tuples_np, num_int_tuples_np, bin_tuples_np, cat_tuples, class_tuple_np
 
     def __len__(self):
         return self.dataset_tuples.shape[0]

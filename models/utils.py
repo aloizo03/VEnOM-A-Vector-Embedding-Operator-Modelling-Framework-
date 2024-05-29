@@ -6,6 +6,7 @@ from efficient_kan import KANLinear
 import os
 import yaml
 from pytorch_metric_learning import losses
+from models.Loss import NTXent, XNegLoss
 
 
 # def _start_residual(self, x, layer, norm_idx):
@@ -24,6 +25,8 @@ from pytorch_metric_learning import losses
 #     if not self.prenormalization:
 #         x = layer[f'norm{norm_idx}'](x)
 #     return x
+
+
 
 class Model_Config:
     def __init__(self, model_config_file):
@@ -116,7 +119,7 @@ def get_parameter_names(model, forbidden_layer_types):
     return result
 
 
-def get_loss_function(loss_function_name='mse', num_classes=3, embedding_size=124):
+def get_loss_function(device, loss_function_name='mse', num_classes=3, embedding_size=124, batch_size=64):
     if loss_function_name.lower() == 'mse':
         return torch.nn.MSELoss()
     elif loss_function_name.lower == 'crossentropy':
@@ -143,6 +146,10 @@ def get_loss_function(loss_function_name='mse', num_classes=3, embedding_size=12
                                      margin=0.01, )
     elif loss_function_name.lower() == 'normlizedsoftmaxloss':
         return losses.NormalizedSoftmaxLoss(num_classes, embedding_size, temperature=0.05)
+    elif loss_function_name.lower() == 'ntxentloss':
+        return NTXent(temperature=10)
+    elif loss_function_name.lower() == 'xnegloss':
+        return XNegLoss(batch_size=batch_size, device=device)
 
 
 class KAN_Transformer(nn.Module):

@@ -16,7 +16,7 @@ def main():
     parser.add_argument('-lr2', '--learning-rate-2', default=1e-2, type=float, help="The learning rate value for the MLP model")
     parser.add_argument('-lf', '--loss-function', default='TripletMarginLoss', type=str, help="The Loss function avail. loss function: [MSE, CrossEntropy, TripletMarginLoss]")
     parser.add_argument('-m', '--miner', action="store_true", help="Use miner within the self-supervised learning")
-    parser.add_argument('-bz', '--batch-size', type=int, default=32, help='total batch size')
+    parser.add_argument('-bz', '--batch-size', type=int, default=64, help='total batch size')
     parser.add_argument('-mc', '--model-config', type=str, help="Path for model configuration file")
     parser.add_argument('-ckpt', '--checkpoint', type=str, default=None, help="Checkpoint to continue the training")
     parser.add_argument('-opt', '--optimiser', type=str, default='SGD', help="Choose optimiser for training learning")
@@ -56,7 +56,7 @@ def main():
                       bias=bias,
                       scheduler=scheduler)
 
-    trainer.train()
+    # trainer.train()
     trainer_MLP = Trainer_Classification_Model(classification=False,
                                                out_path=out_path,
                                                d_out=1,

@@ -64,7 +64,7 @@ class Trainer_Classification_Model:
         with torch.no_grad():
             for batch_idx, batch_data in enumerate(dataloader):
                 num_continuous_tuples, num_int_tuples, bin_tuples, cat_tuples, labels_y = batch_data
-                labels_y = labels_y[0]
+                labels_y = labels_y
                 labels_y = labels_y.type(torch.float64)
                 labels_y = labels_y.to(self.model.device)
 
@@ -86,7 +86,8 @@ class Trainer_Classification_Model:
         acc_list_val = []
         with tqdm(total=self.num_epoch) as pbar:
             for epoch in range(self.num_epoch):
-                train_databuilder, test_databuilder, val_databuilder = datasets.get_Dataset_dataloader(dataset_name=name_of_dataset)
+                train_databuilder, test_databuilder, val_databuilder = datasets.get_Dataset_dataloader(
+                    dataset_name=name_of_dataset)
                 train_dataloader = DataLoader(train_databuilder, batch_size=self.batch_size, shuffle=False)
                 self.embedding_model.train(mode=False)
                 self.MLP_model.train(mode=True)
@@ -101,24 +102,23 @@ class Trainer_Classification_Model:
                     labels_y = labels_y.to(self.embedding_model.device)
 
                     embeddings_ = self.embedding_model(num_int_tuples, num_continuous_tuples, bin_tuples,
-                                                               cat_tuples)
+                                                       cat_tuples)
 
                     y_predict = self.MLP_model(embeddings_)
-
-                    print(y_predict.shape)
-                    print(labels_y.shape)
 
                     acc = calculate_accuracy(y_predict, labels_y)
 
                     loss = self.loss_fun(y_predict, labels_y)
-                    total_loss += loss.backward()
+                    total_loss += loss.item()
                     total_acc += acc
-                    self.optimiser.zero_grad()
+
                     loss.backward()
                     # update weights
-                    optimizer.step()
-                pbar.set_description(f'Epoch :{epoch},'
-                                     f' loss: {total_loss}, acc: {total_acc}')
+                    self.optimiser.step()
+                    if batch_idx % 10 == 10:
+                        pbar.set_description(f'Epoch :{epoch}, batch_idx: {batch_idx}'
+                                             f' loss: {loss.item()}')
+
                 total_loss /= (batch_idx + 1)
                 total_acc /= (batch_idx + 1)
                 acc_list.append(total_acc)
@@ -126,6 +126,10 @@ class Trainer_Classification_Model:
                 acc_val, loss_val = self.test(val_databuilder)
                 acc_list_val.append(acc_val)
                 loss_list_val.append(loss_val)
+
+                pbar.set_description(f'Epoch :{epoch},'
+                                     f' NRMSE loss: {total_loss}, acc: {total_acc}'
+                                     f'Validation NRMSE loss: {total_loss}, acc: {total_acc}')
 
 
 class Trainer:
@@ -175,7 +179,8 @@ class Trainer:
                                                  d_out=model_configurations.attention_hidden_dim)
         logger.info(self.model)
 
-        self.loss_function = get_loss_function(loss_function_name=self.loss_function_name)
+        self.loss_function = get_loss_function(loss_function_name=self.loss_function_name, batch_size=batch_size,
+                                               device=self.model.device, embedding_size=self.model_config.d_out)
 
         self.optimiser_ = get_optimiser(parameters=self.model.parameters(),
                                         optimiser_name=optimiser,
@@ -321,7 +326,7 @@ class Trainer:
                 labels_y = labels_y.to(self.model.device)
 
                 embedding_transform_repr_proj = self.embedding_model(num_int_tuples, num_continuous_tuples, bin_tuples,
-                                                   cat_tuples)
+                                                                     cat_tuples)
                 if self.miner:
                     hard_pairs = miner(embedding_transform_repr_proj, labels_y)
                     # Optimise MLP
@@ -340,7 +345,7 @@ class Trainer:
             logger.info('Training with miner')
         loss_values = {}
         loss_values_val = {}
-
+        val_loss = 0
         for dataset_name in self.datasets.datasets_dict.keys():
             loss_values[dataset_name] = []
             loss_values_val[dataset_name] = []
@@ -377,6 +382,9 @@ class Trainer:
 
                         loss_.backward()
                         self.optimiser_.step()
+                        if batch_idx % 10 == 0:
+                            pbar.set_description(f'Epoch :{epoch}, Dataset name: {dataset_name}, batch ID{batch_idx}'
+                                                 f' train loss: {epoch_loss}, validation loss: {val_loss}')
 
                     total_loss /= (batch_idx + 1)
 
