@@ -1,0 +1,32 @@
+#adult:
+#  -path: "/home/antreas/PycharmProjects/Vector Embedding/data/adult.csv"
+#  -numerical: []
+#  -float: []
+#  -text: []
+#  -binary: []
+#  -class: []
+
+
+#wine_origin:
+#  path: "C:/Users/antre/PycharmProjects/Vector Embedding/data/wine_origin/wine.csv"
+#  numerical_continues: ["Alcohol", "Malicacid", "Ash", "Alcalinity_of_ash", "Total_phenols", "Flavanoids", "Nonflavanoid_phenols", "Proanthocyanins", "Color_intensity", "Hue", "0D280_0D315_of_diluted_wines"]
+#  numerical_integer: ["Magnesium", "Proline"]
+#  text: []
+#  binary: []
+#  class: ["class"]
+#
+#wine_quality:
+#  path: "C:/Users/antre/PycharmProjects/Vector Embedding/data/wine_quality/wine_quality.csv"
+#  numerical_continues: ["fixed_acidity", "volatile_acidity", "citric_acid", "residual_sugar", "chlorides", "free_sulfur_dioxide", "total_sulfur_dioxide", "density", "pH", "sulphates", "alcohol"]
+#  numerical_integer: []
+#  text: []
+#  binary: ["color"]
+#  class: ["quality"]
+
+Household_power_consumption:
+  path: "C:/Users/antre/PycharmProjects/Vector Embedding/data/Household Power Consumption/"
+  numerical_continues: [ "Global_active_power", "Global_reactive_power", "Voltage", "Global_intensity", "Sub_metering_1", "Sub_metering_2" ]
+  numerical_integer: [ ]
+  text: [ ]
+  binary: []
+  class: [ "class" ]

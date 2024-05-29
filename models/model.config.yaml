@@ -1,0 +1,14 @@
+num_layers : 4
+d_token: 40
+head_num: 4
+attention_hidden_dim: 128
+attention_type_of_layer: "Pre-LN"
+attention_dropout: 0.1
+ffn_dropout: 0.1
+ffn_dim: 246
+d_out: 10
+activation: "relu"
+weight_decay: 0.1
+momentum: 0.8
+lrf: 0.1
+mlp_hidden_dim: 64
