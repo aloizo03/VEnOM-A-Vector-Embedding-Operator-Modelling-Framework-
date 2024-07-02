@@ -16,7 +16,7 @@
 #
 # # variable information
 # print(wine.variables)
-
+import numpy as np
 # Load model directly
 # from transformers import AutoTokenizer, AutoModelForCausalLM
 #
@@ -29,3 +29,12 @@
 # print(TABLE_TRANSFORMER_PRETRAINED_MODEL_ARCHIVE_LIST)
 # model = TableTransformerModel.from_pretrained("microsoft/table-transformer-detection")
 
+# Load model directly
+from transformers import AutoTokenizer, AutoModel
+
+tokenizer = AutoTokenizer.from_pretrained("facebook/data2vec-text-base")
+model = AutoModel.from_pretrained("facebook/data2vec-text-base")
+tokens = tokenizer('Hello world')
+print(tokens)
+out = model(tokens['input_ids'])
+print(out)

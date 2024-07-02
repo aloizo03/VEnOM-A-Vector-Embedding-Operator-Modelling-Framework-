@@ -9,7 +9,8 @@ def calculate_accuracy(predictions, gt_labels):
     :param gt_labels:  torch.Tensor, a tensor with the ground ruth label for each prediction
     :return: float: the accuracy of the model prediction for this predictions
     """
-    _, predicts = torch.max(torch.softmax(predictions, dim=1), dim=1, keepdim=False)
+    soft_max = torch.softmax(predictions, dim=-1)
+    _, predicts = torch.max(soft_max, dim=-1, keepdim=False)
     corrects = (predicts == gt_labels).sum()
     corrects = corrects.cpu().detach().numpy()
 

@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
+
 class MLP(nn.Module):
 
     def __init__(self, input_dim, hidden_dim, out_dim, num_of_layers=3, bias=False, init_=True, classification=True, device=None):

@@ -6,27 +6,7 @@ from efficient_kan import KANLinear
 import os
 import yaml
 from pytorch_metric_learning import losses
-from models.Loss import NTXent, XNegLoss
-
-
-# def _start_residual(self, x, layer, norm_idx):
-#     x_residual = x
-#     if self.prenormalization:
-#         norm_key = f'norm{norm_idx}'
-#         if norm_key in layer:
-#             x_residual = layer[norm_key](x_residual)
-#     return x_residual
-#
-#
-# def _end_residual(self, x, x_residual, layer, norm_idx):
-#     if self.residual_dropout:
-#         x_residual = F.dropout(x_residual, self.residual_dropout, self.training)
-#     x = x + x_residual
-#     if not self.prenormalization:
-#         x = layer[f'norm{norm_idx}'](x)
-#     return x
-
-
+from models.Loss import Loss_VAE
 
 class Model_Config:
     def __init__(self, model_config_file):
@@ -58,8 +38,9 @@ def load_model_config(config_path):
     return Model_Config(model_config)
 
 
+# TODO: add activation function
 def get_Transformer_Layer(idx, hidden_dim_size, head_num, att_dropout_prob, ffn_dropout_prob, ffn_dim,
-                          type_of_layer='Pre-LN', device='cuda:0', dtype=torch.float64):
+                          activation_fun='relu', type_of_layer='Pre-LN', device='cuda:0', dtype=torch.float64):
     if type_of_layer == 'Pre-LN':
         layer_ = nn.ModuleDict({
             f'norm_layer_{idx}_0': nn.LayerNorm(hidden_dim_size, device=device, dtype=dtype),
@@ -94,13 +75,24 @@ def get_Transformer_Layer(idx, hidden_dim_size, head_num, att_dropout_prob, ffn_
         return layer_
 
 
-def get_optimiser(optimiser_name, parameters, lr, weight_decay, momentum):
+def get_optimiser(optimiser_name, parameters, lr, weight_decay, momentum, beta=0.5):
     if optimiser_name.lower() == 'adam':
         return torch.optim.Adam(params=parameters, lr=lr, weight_decay=weight_decay)
     elif optimiser_name.lower() == 'sgd':
         return torch.optim.SGD(params=parameters, lr=lr, momentum=momentum, weight_decay=weight_decay)
     else:
         AssertionError('Wrong optimiser name avail optimisers : (Adam, SGD)')
+
+
+def get_activation_function(act_):
+    if act_.lower() == 'relu':
+        return F.relu
+    elif act_.lower() == 'gelu':
+        return F.gelu
+    elif act_.lower() == 'selu':
+        return F.selu_
+    elif act_.lower() == 'leakyrelu':
+        return F.leaky_relu
 
 
 def get_parameter_names(model, forbidden_layer_types):
@@ -122,34 +114,40 @@ def get_parameter_names(model, forbidden_layer_types):
 def get_loss_function(device, loss_function_name='mse', num_classes=3, embedding_size=124, batch_size=64):
     if loss_function_name.lower() == 'mse':
         return torch.nn.MSELoss()
-    elif loss_function_name.lower == 'crossentropy':
-        return torch.nn.CrossEntropyLoss()
-    elif loss_function_name.lower() == 'tripletmarginloss':
-        return losses.TripletMarginLoss()
-    elif loss_function_name.lower() == 'marginloss':
-        return losses.MarginLoss(margin=0.2,
-                                 nu=0,
-                                 beta=1.2,
-                                 triplets_per_anchor="all",
-                                 learn_beta=False,
-                                 num_classes=num_classes)
-    elif loss_function_name.lower() == 'arcfaceloss':
-        return losses.ArcFaceLoss(num_classes, embedding_size, margin=28.6, scale=64)
-    elif loss_function_name.lower() == 'proxyanchorloss':
-        return losses.ProxyAnchorLoss(num_classes, embedding_size, margin=0.1, alpha=32)
-    elif loss_function_name.lower() == 'softtripleloss':
-        return losses.SoftTripleLoss(num_classes,
-                                     embedding_size,
-                                     centers_per_class=10,
-                                     la=20,
-                                     gamma=0.1,
-                                     margin=0.01, )
-    elif loss_function_name.lower() == 'normlizedsoftmaxloss':
-        return losses.NormalizedSoftmaxLoss(num_classes, embedding_size, temperature=0.05)
-    elif loss_function_name.lower() == 'ntxentloss':
-        return NTXent(temperature=10)
-    elif loss_function_name.lower() == 'xnegloss':
-        return XNegLoss(batch_size=batch_size, device=device)
+    elif loss_function_name.lower() == 'loss_vae':
+        return Loss_VAE()
+    else:
+        AssertionError(f'Wrong loss function {loss_function_name}')
+    # if loss_function_name.lower() == 'mse':
+    #     return torch.nn.MSELoss()
+    # elif loss_function_name.lower == 'crossentropy':
+    #     return torch.nn.CrossEntropyLoss()
+    # elif loss_function_name.lower() == 'tripletmarginloss':
+    #     return losses.TripletMarginLoss()
+    # elif loss_function_name.lower() == 'marginloss':
+    #     return losses.MarginLoss(margin=0.2,
+    #                              nu=0,
+    #                              beta=1.2,
+    #                              triplets_per_anchor="all",
+    #                              learn_beta=False,
+    #                              num_classes=num_classes)
+    # elif loss_function_name.lower() == 'arcfaceloss':
+    #     return losses.ArcFaceLoss(num_classes, embedding_size, margin=28.6, scale=64)
+    # elif loss_function_name.lower() == 'proxyanchorloss':
+    #     return losses.ProxyAnchorLoss(num_classes, embedding_size, margin=0.1, alpha=32)
+    # elif loss_function_name.lower() == 'softtripleloss':
+    #     return losses.SoftTripleLoss(num_classes,
+    #                                  embedding_size,
+    #                                  centers_per_class=10,
+    #                                  la=20,
+    #                                  gamma=0.1,
+    #                                  margin=0.01, )
+    # elif loss_function_name.lower() == 'normlizedsoftmaxloss':
+    #     return losses.NormalizedSoftmaxLoss(num_classes, embedding_size, temperature=0.05)
+    # elif loss_function_name.lower() == 'ntxentloss':
+    #     return NTXent(temperature=10)
+    # elif loss_function_name.lower() == 'xnegloss':
+    #     return XNegLoss(batch_size=batch_size, device=device)
 
 
 class KAN_Transformer(nn.Module):

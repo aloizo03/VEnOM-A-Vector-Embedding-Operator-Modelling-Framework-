@@ -6,53 +6,45 @@ import yaml
 from torch.utils import data
 from data.data_utils import transformation_binary
 from sklearn.model_selection import train_test_split
+from sklearn import preprocessing
 
 
 class DataBuilder(data.Dataset):
-    def __init__(self, filepath, num_con_columns, num_int_columns, num_bin_columns, categorical_columns, col_idx,
-                 labels=[], transformation_bin=True):
+    def __init__(self, filepath, columns, col_idx,
+                 labels=[], norm=True, augmentation=True, ret_labels=False):
         super().__init__()
+        # Chnage it to take per file and when finish to open a new file
         if type(filepath) is list and type(col_idx) is list:
             df = pd.DataFrame()
             for file, idx in zip(filepath, col_idx):
                 dataset_tuple = pd.read_csv(file).iloc[idx]
-                df = pd.concat([dataset_tuple, df])
+                df = pd.concat([df, dataset_tuple])
             self.dataset_tuples = df
         else:
             self.dataset_tuples = pd.read_csv(filepath).iloc[col_idx]
-        self.num_continuous_col = num_con_columns
-        self.num_int_columns = num_int_columns
-        self.num_bin_columns = num_bin_columns
-        self.categorical_columns = categorical_columns
+        self.columns = columns
         self.labels_class_columns = labels
-        self.transformation_bin = True
+        self.transformation_bin = False
+        self.normalise_data = norm
+        self.augmentation = augmentation
+        self.ret_labels = ret_labels
 
     def __getitem__(self, idx):
         row_tuple = self.dataset_tuples.iloc[[idx]]
-        continuous_tuples = row_tuple[self.num_continuous_col].values.flatten().tolist()
-        num_int_tuples = row_tuple[self.num_int_columns].values.flatten().tolist()
-        bin_tuples = row_tuple[self.num_bin_columns].values.flatten().tolist()
-        cat_tuples = row_tuple[self.categorical_columns].values.flatten().tolist()
-        if self.transformation_bin:
-            bin_tuples = transformation_binary(tuples=bin_tuples)
-        continuous_tuples_np = np.asarray(continuous_tuples, dtype=np.float64)
-        continuous_tuples_np = np.nan_to_num(continuous_tuples_np)
+        tuples = row_tuple[self.columns].values.flatten().tolist()
 
-        num_int_tuples_np = np.asarray(num_int_tuples, dtype=np.float64)
-        num_int_tuples_np = np.nan_to_num(num_int_tuples_np)
+        tuples_np = np.asarray(tuples, dtype=np.float64)
+        tuples_np = np.nan_to_num(tuples_np)
 
-        bin_tuples_np = np.asarray(bin_tuples, dtype=np.float64)
-        bin_tuples_np = np.nan_to_num(bin_tuples_np)
+        if self.normalise_data:
+            tuples_np = preprocessing.normalize([tuples_np])[0]
 
-        if self.labels_class_columns is []:
-            return continuous_tuples_np, num_int_tuples_np, bin_tuples_np, cat_tuples
-        else:
-            if len(self.labels_class_columns) > 1:
-                class_tuple = row_tuple[self.labels_class_columns].values.flatten().tolist()
-            else:
-                class_tuple = row_tuple[self.labels_class_columns].values.flatten().tolist()
+        if self.ret_labels:
+            class_tuple = row_tuple[self.labels_class_columns].values.flatten().tolist()
             class_tuple_np = np.asarray(class_tuple, dtype=np.float64)
-            return continuous_tuples_np, num_int_tuples_np, bin_tuples_np, cat_tuples, class_tuple_np
+            return tuples_np, class_tuple_np
+        else:
+            return tuples_np
 
     def __len__(self):
         return self.dataset_tuples.shape[0]
@@ -60,14 +52,13 @@ class DataBuilder(data.Dataset):
 
 class Dataset:
 
-    def __init__(self, data_conf, return_labels=True, split=True, train=0.75, test=0.15, val=0.1):
+    def __init__(self, data_conf, return_labels=True, split=True,
+                 train=0.75, test=0.15, val=0.1, norm=False, augment=True):
         self.datasets_dict = data_conf
-        self.d_cat = 0
-        self.d_num_con = 0
-        self.d_num_int = 0
-        self.d_bin = 0
         self.categorical_columns = []
-        self.find_d_input()
+        self.normalise_data = norm
+        self.augmentation = augment
+
         # self.add_categorical_columns()
         self.split = split
         if split:
@@ -76,16 +67,6 @@ class Dataset:
                                     val=val)
         for dataset_name, dataset in self.datasets_dict.items():
             self.set_paths(dataset_name=dataset_name, filepath=dataset['path'])
-    # def add_categorical_columns(self):
-
-    def find_d_input(self):
-
-        for dataset_name, dataset in self.datasets_dict.items():
-            # print(dataset)
-            self.d_cat = np.maximum(self.d_cat, len(dataset['text']))
-            self.d_bin = np.maximum(self.d_bin, len(dataset['binary']))
-            self.d_num_con = np.maximum(self.d_num_int, len(dataset['numerical_continues']))
-            self.d_num_con = np.maximum(self.d_num_int, len(dataset['numerical_integer']))
 
     def add_dataset(self, dataset_name, cat_columns, num_con_columns, num_int_columns, bin_columns):
         dataset_ = {"numerical_continues": num_con_columns,
@@ -156,10 +137,7 @@ class Dataset:
 
     def get_Dataset_dataloader(self, dataset_name):
         dataset_path = self.datasets_dict[dataset_name]['path']
-        num_con_columns = self.datasets_dict[dataset_name]['numerical_continues']
-        num_int_columns = self.datasets_dict[dataset_name]['numerical_integer']
-        num_binary = self.datasets_dict[dataset_name]['binary']
-        categorical_columns = self.datasets_dict[dataset_name]['text']
+        tuples_columns = self.datasets_dict[dataset_name]['columns']
         class_columns = self.datasets_dict[dataset_name]['class']
 
         train_idx = self.datasets_dict[dataset_name]['train_idx']
@@ -167,26 +145,20 @@ class Dataset:
         val_idx = self.datasets_dict[dataset_name]['val_idx']
 
         train_data_builder = DataBuilder(filepath=dataset_path,
-                                         num_con_columns=num_con_columns,
-                                         num_int_columns=num_int_columns,
-                                         num_bin_columns=num_binary,
-                                         categorical_columns=categorical_columns,
+                                         columns=tuples_columns,
                                          labels=class_columns,
-                                         col_idx=train_idx)
+                                         col_idx=train_idx,
+                                         norm=self.normalise_data)
         test_data_builder = DataBuilder(filepath=dataset_path,
-                                        num_con_columns=num_con_columns,
-                                        num_int_columns=num_int_columns,
-                                        num_bin_columns=num_binary,
-                                        categorical_columns=categorical_columns,
+                                        columns=tuples_columns,
                                         labels=class_columns,
-                                        col_idx=val_idx)
+                                        col_idx=val_idx,
+                                        norm=self.normalise_data)
         val_data_builder = DataBuilder(filepath=dataset_path,
-                                       num_con_columns=num_con_columns,
-                                       num_int_columns=num_int_columns,
-                                       num_bin_columns=num_binary,
-                                       categorical_columns=categorical_columns,
+                                       columns=tuples_columns,
                                        labels=class_columns,
-                                       col_idx=test_idx)
+                                       col_idx=test_idx,
+                                       norm=self.normalise_data)
 
         return train_data_builder, test_data_builder, val_data_builder
 

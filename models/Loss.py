@@ -13,8 +13,20 @@ class RMSELoss(nn.Module):
         return torch.sqrt(self.mse(yhat, y))
 
 
+class Loss_VAE(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.mse_loss = nn.MSELoss(reduction="sum")
+
+    def forward(self, x_recon, x, mu, logvar):
+        loss_MSE = self.mse_loss(x_recon, x)
+        loss_KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+
+        return loss_MSE, loss_KLD
+
+
 class Loss_Compute:
-    #TODO: fix it error in the
+    # TODO: fix it error in the
     def __init__(self, device, batch_size=64, normalize_loss=False, temperature=10,
                  base_temperature=10, criterion=None):
         self.device = device
@@ -173,7 +185,7 @@ class JointLoss(nn.Module):
 
 class XNegLoss(nn.Module):
 
-    def __init__(self, batch_size, device, cosine_similarity=True):
+    def __init__(self, batch_size, device, cosine_similarity=False):
         super().__init__()
         self.batch_size = batch_size
         self.device = device
@@ -190,11 +202,11 @@ class XNegLoss(nn.Module):
         # Reshape y: (2N, C) -> (1, C, 2N)
         y = y.T.unsqueeze(0)
         # Similarity shape: (2N, 2N)
-        similarity = th.tensordot(x, y, dims=2)
+        similarity = torch.tensordot(x, y, dims=2)
         return similarity
 
     def _cosine_simililarity(self, x, y):
-        similarity = th.nn.CosineSimilarity(dim=-1)
+        similarity = nn.CosineSimilarity(dim=-1)
         # Reshape x: (2N, C) -> (2N, 1, C)
         x = x.unsqueeze(1)
         # Reshape y: (2N, C) -> (1, C, 2N)
@@ -210,30 +222,33 @@ class XNegLoss(nn.Module):
         # Diagonal 2Nx2N matrix with 3rd quadrant being identity matrix
         q3 = np.eye((2 * self.batch_size), 2 * self.batch_size, k=-self.batch_size)
         # Generate mask with diagonals of all four quadrants being 1.
-        mask = th.from_numpy((diagonal + q1 + q3))
+        mask = torch.from_numpy((diagonal + q1 + q3))
         # Reverse the mask: 1s become 0, 0s become 1. This mask will be used to select negative samples
-        mask = (1 - mask).type(th.bool)
+        mask = (1 - mask).type(torch.bool)
         # Transfer the mask to the device and return
         return mask.to(self.device)
 
     def forward(self, representation):
         # Compute similarity matrix
-        similarity = self.similarity_fn(representation, representation)
+        similarity = self.similarity_fun(representation, representation)
         # Get similarity scores for the positive samples from the diagonal of the first quadrant in 2Nx2N matrix
-        l_pos = th.diag(similarity, self.batch_size)
+        l_pos = torch.diag(similarity)
         # Get similarity scores for the positive samples from the diagonal of the third quadrant in 2Nx2N matrix
-        r_pos = th.diag(similarity, -self.batch_size)
+        r_pos = torch.diag(similarity, )
         # Concatenate all positive samples as a 2nx1 column vector
-        positives = th.cat([l_pos, r_pos]).view(2 * self.batch_size, 1)
+        positives = torch.cat([l_pos, r_pos]).view(2 * self.batch_size, 1)
         # Get similarity scores for the negative samples (samples outside diagonals in 4 quadrants in 2Nx2N matrix)
-        negatives = similarity[self.mask_for_neg_samples].view(2 * self.batch_size, -1)
+        negatives = similarity[self.mask_neg_samples[:self.batch_size, :self.batch_size]].view(self.batch_size, -1)
         # Concatenate positive samples as the first column to negative samples array
-        logits = th.cat((positives, negatives), dim=1)
+
+        print(positives.shape)
+        print(negatives.shape)
+        logits = torch.cat((positives, negatives), dim=1)
         # Normalize logits via temperature
         logits /= self.temperature
         # Labels are all zeros since all positive samples are the 0th column in logits array.
         # So we will select positive samples as numerator in NTXentLoss
-        labels = th.zeros(2 * self.batch_size).to(self.device).long()
+        labels = torch.zeros(2 * self.batch_size).to(self.device).long()
         # Compute total loss
         loss = self.criterion(logits, labels)
         # Loss per sample

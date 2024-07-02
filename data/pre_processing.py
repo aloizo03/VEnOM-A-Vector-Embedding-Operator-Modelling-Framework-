@@ -11,12 +11,14 @@ def pre_process_adult_dataset(df):
     income_unique = np.unique(df['income'].tolist())
 
     race_to_idx = {race: count for count, race in enumerate(race_unique)}
-    gender_to_idx = {gender: count for count, gender in enumerate(race_unique)}
+    gender_to_idx = {gender: count for count, gender in enumerate(gender_unique)}
     income_to_idx = {income: count for count, income in enumerate(income_unique)}
 
     df["race"] = df["race"].map(race_to_idx)
     df["gender"] = df["gender"].map(gender_to_idx)
     df["income"] = df["income"].map(income_to_idx)
+
+    df = df.replace('?', np.NaN)
 
     return df
 

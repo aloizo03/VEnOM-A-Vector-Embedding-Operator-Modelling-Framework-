@@ -2,10 +2,10 @@
 import argparse
 import time
 import numpy as np
-from models.trainer import Trainer, Trainer_Classification_Model
-from models.vectorEmbedding import VectorEmbedding_Transformer
+from models.trainer import Trainer
 import os
 
+#todo: check outpath if exists
 
 def main():
     parser = argparse.ArgumentParser()
@@ -14,7 +14,7 @@ def main():
     parser.add_argument("-e", '--epochs', type=int, default=100)
     parser.add_argument('-lr', '--learning-rate', default=1e-2, type=float, help="The learning rate value")
     parser.add_argument('-lr2', '--learning-rate-2', default=1e-2, type=float, help="The learning rate value for the MLP model")
-    parser.add_argument('-lf', '--loss-function', default='TripletMarginLoss', type=str, help="The Loss function avail. loss function: [MSE, CrossEntropy, TripletMarginLoss]")
+    parser.add_argument('-lf', '--loss-function', default='loss_vae', type=str, help="The Loss function avail. loss function: [MSE, CrossEntropy, TripletMarginLoss]")
     parser.add_argument('-m', '--miner', action="store_true", help="Use miner within the self-supervised learning")
     parser.add_argument('-bz', '--batch-size', type=int, default=64, help='total batch size')
     parser.add_argument('-mc', '--model-config', type=str, help="Path for model configuration file")
@@ -43,7 +43,6 @@ def main():
     unsupervised_learning = args.unsupervised_learning
     miner = args.miner
     # TODO: Add check for checkpoint
-
     trainer = Trainer(data_config=input_data_config,
                       model_config_path=model_config,
                       out_path=out_path,
@@ -56,20 +55,7 @@ def main():
                       bias=bias,
                       scheduler=scheduler)
 
-    # trainer.train()
-    trainer_MLP = Trainer_Classification_Model(classification=False,
-                                               out_path=out_path,
-                                               d_out=1,
-                                               embedding_model=trainer.model,
-                                               batch_size=batch_size,
-                                               lr=lr_2,
-                                               bias=False,
-                                               num_epochs=5,
-                                               optimiser='Adam',
-                                               d_hidden=1024,
-                                               num_of_layers=3,
-                                               d_in=trainer.model_config.attention_hidden_dim)
-    trainer_MLP.train(datasets=trainer.datasets, name_of_dataset='Household_power_consumption')
+    trainer.train()
 
 
 if __name__ == '__main__':
