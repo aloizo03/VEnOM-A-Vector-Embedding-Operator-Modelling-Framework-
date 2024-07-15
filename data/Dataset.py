@@ -13,7 +13,7 @@ class DataBuilder(data.Dataset):
     def __init__(self, filepath, columns, col_idx,
                  labels=[], norm=True, augmentation=True, ret_labels=False):
         super().__init__()
-        # Chnage it to take per file and when finish to open a new file
+        # Change it to take per file and when finish to open a new file
         if type(filepath) is list and type(col_idx) is list:
             df = pd.DataFrame()
             for file, idx in zip(filepath, col_idx):
@@ -53,7 +53,7 @@ class DataBuilder(data.Dataset):
 class Dataset:
 
     def __init__(self, data_conf, return_labels=True, split=True,
-                 train=0.75, test=0.15, val=0.1, norm=False, augment=True):
+                 train=0.75, test=0.15, val=0.1, norm=True, augment=True):
         self.datasets_dict = data_conf
         self.categorical_columns = []
         self.normalise_data = norm

@@ -6,6 +6,14 @@
 #  -binary: []
 #  -class: []
 
+#adult_dataset:
+#  path: "C:/Users/antre/PycharmProjects/Vector Embedding/data/adult/adult.csv"
+#  numerical_continues: []
+#  numerical_integer: ['age', 'fnlwgt', 'educational-num', 'capital-gain', 'capital-loss', 'hours-per-week', 'race']
+#  text: ['workclass', 'education', 'marital-status', 'occupation', 'relationship', 'native-country']
+#  binary: ['gender']
+#  class: ["income"]
+
 
 #wine_origin:
 #  path: "C:/Users/antre/PycharmProjects/Vector Embedding/data/wine_origin/wine.csv"
@@ -14,7 +22,7 @@
 #  text: []
 #  binary: []
 #  class: ["class"]
-#
+
 #wine_quality:
 #  path: "C:/Users/antre/PycharmProjects/Vector Embedding/data/wine_quality/wine_quality.csv"
 #  numerical_continues: ["fixed_acidity", "volatile_acidity", "citric_acid", "residual_sugar", "chlorides", "free_sulfur_dioxide", "total_sulfur_dioxide", "density", "pH", "sulphates", "alcohol"]
@@ -25,8 +33,10 @@
 
 Household_power_consumption:
   path: "C:/Users/antre/PycharmProjects/Vector Embedding/data/Household Power Consumption/"
-  numerical_continues: [ "Global_active_power", "Global_reactive_power", "Voltage", "Global_intensity", "Sub_metering_1", "Sub_metering_2" ]
-  numerical_integer: [ ]
-  text: [ ]
-  binary: []
+  columns: [ "Global_active_power", "Global_reactive_power", "Voltage", "Global_intensity", "Sub_metering_1", "Sub_metering_2" ]
   class: [ "class" ]
+
+Weather:
+  path: "C:/Users/antre/PycharmProjects/Vector Embedding/data/weather_small_sample"
+  columns: ["min_temp_c","max_temp_c","precipitation_mm","snow_depth_mm","avg_wind_dir_deg","avg_wind_speed_kmh","peak_wind_gust_kmh","avg_sea_level_pres_hpa","sunshine_total_min" ]
+  class: [ "avg_temp_c" ]

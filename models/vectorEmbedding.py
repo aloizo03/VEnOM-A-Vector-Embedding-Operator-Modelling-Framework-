@@ -155,6 +155,7 @@ class Num2Vec(nn.Module):
         # self.corruption_rate = corruption_rate
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.dim_numerical = d_numerical
+        self.d_out = d_out
 
         self.numerical_embedding = Numerical_Embedding(dim=d_token,
                                                        dim_numerical=d_numerical,

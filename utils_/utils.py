@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import os
 
 
 def calculate_accuracy(predictions, gt_labels):
@@ -15,3 +16,13 @@ def calculate_accuracy(predictions, gt_labels):
     corrects = corrects.cpu().detach().numpy()
 
     return corrects / gt_labels.size(0)
+
+
+def check_path(path):
+    if not os.path.exists(path):
+        AssertionError(f'Filepath {path} is not exist')
+
+
+def get_parent_dir(filepath):
+    head, tail = os.path.split(filepath)
+    print(head, tail)
