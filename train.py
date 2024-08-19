@@ -7,8 +7,6 @@ from utils_.utils import check_path
 import os
 
 
-# todo: check outpath if exists
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--data-config", type=str, help="Input datasets path")
@@ -25,6 +23,7 @@ def main():
     parser.add_argument('-opt', '--optimiser', type=str, default='SGD', help="Choose optimiser for training learning")
 
     parser.add_argument('-b', '--bias', type=bool, default=False, help='Select if we will have bias')
+
     parser.add_argument("-le", "--label-encoder", action="store_true")
     parser.add_argument("-lrs", "--lr-scheduler", action='store_true')
 

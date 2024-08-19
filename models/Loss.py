@@ -14,15 +14,22 @@ class RMSELoss(nn.Module):
 
 
 class Loss_VAE(nn.Module):
-    def __init__(self):
+    def __init__(self, KLD_weight=0.5):
         super().__init__()
-        self.mse_loss = nn.MSELoss(reduction="sum")
+        self.mse_loss = nn.MSELoss(reduction="mean")
+        self.KLD_weight = KLD_weight
 
     def forward(self, x_recon, x, mu, logvar):
-        loss_MSE = self.mse_loss(x_recon, x)
-        loss_KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+        loss_MSE = 0.5 * self.mse_loss(x_recon, x)
+        # loss_KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+        # loss_KLD = -self.KLD_weight * torch.mean(1 + logvar - torch.square(mu) - torch.exp(logvar), axis=-1)
+        loss_KLD = self._compute_kl_loss(mean=mu,
+                                         log_variance=logvar)
 
         return loss_MSE, loss_KLD
+
+    def _compute_kl_loss(self, mean, log_variance):
+        return -0.5 * torch.sum(1 + log_variance - mean.pow(2) - log_variance.exp())
 
 
 class Loss_Compute:

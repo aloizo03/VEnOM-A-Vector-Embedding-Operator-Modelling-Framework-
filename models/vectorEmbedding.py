@@ -3,22 +3,18 @@ import typing as ty
 from pathlib import Path
 
 from torch.xpu import device
+import torch.nn.functional as F
+
+from models.distribution.hyperspherical_uniform import HypersphericalUniform
+from models.distribution.von_mises_fisher import VonMisesFisher
 
 from models.utils import get_Transformer_Layer, get_activation_function
-import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.nn.init as nn_init
-from torch.distributions.uniform import Uniform
-from torch import Tensor
-from transformers import BertTokenizer, BertTokenizerFast
-import os
-import pandas as pd
 from torch.autograd import Variable
 
 
-# TODO: Change tranformer layers
 class Decoder(nn.Module):
     def __init__(self,
                  input_dim: int,
@@ -30,7 +26,7 @@ class Decoder(nn.Module):
                  ffn_dim: int,
                  activation_fun,
                  d_out: int,
-                 device):
+                 device, ):
         super().__init__()
         self.device = device
         self.input_layer_dec = nn.Linear(input_dim, d_token, device=self.device, bias=True, dtype=torch.float64)
@@ -51,6 +47,7 @@ class Decoder(nn.Module):
         z_out = self.input_layer_dec(z)
         z_out = self.activation_fun(z_out)
         z_transform = self.Transformer_layers(z_out)
+
         decoded = self.out_layer_dec(self.activation_fun(z_transform))
 
         return decoded
@@ -59,7 +56,7 @@ class Decoder(nn.Module):
 class Embedding_Transformer_Layers(nn.Module):
     def __init__(self, num_layer, hidden_dim, head_num, ffn_dim=128,
                  att_dropout_prob=0.1, ffn_dropout_prob=0.1, activation='relu',
-                 type_of_layer='Pre-LN', device='cuda:0'):
+                 type_of_layer='Pre-LN', device='cuda'):
         super().__init__()
         if num_layer < 1:
             AssertionError('The number of layers for the transformer cannot be zero and bellow!!')
@@ -114,10 +111,17 @@ class Embedding_Transformer_Layers(nn.Module):
 
 # Will be used from
 class Numerical_Embedding(nn.Module):
-    def __init__(self, dim, dim_numerical, bias=True, device='cuda:0'):
+    def __init__(self, dim, dim_numerical, d_tokens, activation, bias=True, device='cuda'):
         super().__init__()
-        self.weights = nn.Parameter(torch.randn(dim_numerical, dim, device=device))
-        self.bias = nn.Parameter(torch.randn(dim_numerical, dim, device=device)) if bias else None
+        dim_input = dim_numerical
+
+        # Embeddings
+        self.weights = nn.Parameter(torch.randn(dim_input, dim, device=device))
+        self.bias = nn.Parameter(torch.randn(dim_input, dim, device=device)) if bias else None
+
+        self.activation = activation
+        self.linear_layer = nn.Linear(dim, d_tokens, device=device, bias=True, dtype=torch.float64)
+
         nn_init.kaiming_uniform_(self.weights, a=math.sqrt(5))
         if self.bias is not None:
             nn_init.kaiming_uniform_(self.bias, a=math.sqrt(5))
@@ -125,6 +129,7 @@ class Numerical_Embedding(nn.Module):
     def forward(self, x):
         x_num = torch.cat([torch.ones(x.shape, device=x.device)]
                           + ([] if x is None else [x]), dim=1)
+
         x_out = self.weights[:x_num.shape[1]] * x_num[:, :, None]
         if self.bias is not None:
             bias = torch.cat(
@@ -132,6 +137,9 @@ class Numerical_Embedding(nn.Module):
                  self.bias]
             )
             x_out = x_out + bias[:x_out.shape[1]]
+
+        # Check with that in KLD
+        # x_out = self.linear_layer(self.activation(x_out))
         return x_out
 
 
@@ -148,19 +156,37 @@ class Num2Vec(nn.Module):
                  activation: str,
                  #
                  d_out: int,
-                 train: bool):
+                 train: bool,
+                 input_table=True,
+                 d_k=100,
+                 ret_all_dataset=True,
+                 distribution='normal'):
+
         super().__init__()
-        # Feature extractor for feature tokenizer
-        # Later work see if we can have BERT head or TaBERT
-        # self.corruption_rate = corruption_rate
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        self.distribution = distribution
+
         self.dim_numerical = d_numerical
         self.d_out = d_out
+        self.ret_all_dataset = ret_all_dataset
+
+        self.d_tokens = d_token
+
+        self.input_table = input_table
+        if input_table:
+            # Can be whole dataset or parts from a dataset
+            self.dim_k = d_k
+            self.dim_numerical = d_numerical * d_k
+        self.activation_fun = get_activation_function(act_=activation)
 
         self.numerical_embedding = Numerical_Embedding(dim=d_token,
-                                                       dim_numerical=d_numerical,
+                                                       dim_numerical=self.dim_numerical,
+                                                       d_tokens=self.d_tokens,
                                                        bias=True,
-                                                       device=self.device)
+                                                       device=self.device,
+                                                       activation=self.activation_fun)
+
         self.Transformer_layers = Embedding_Transformer_Layers(num_layer=n_layers,
                                                                hidden_dim=d_token,
                                                                head_num=head_num,
@@ -169,45 +195,48 @@ class Num2Vec(nn.Module):
                                                                ffn_dropout_prob=ffn_dropout,
                                                                type_of_layer='Pre-LN',
                                                                device=self.device)
-        self.activation_fun = get_activation_function(act_=activation)
+
         # Vector μ and σ
         self.out_layer_m = nn.Linear(d_token, d_out, device=self.device, bias=True, dtype=torch.float64)
         self.out_layer_s = nn.Linear(d_token, d_out, device=self.device, bias=True, dtype=torch.float64)
 
-        if train:
-            # Create decoder
-            self.decoder = Decoder(input_dim=3,
-                                   d_token=d_token,
-                                   ffn_dim=ffn_dim,
-                                   head_num=head_num,
-                                   ffn_dropout=ffn_dropout,
-                                   n_layers=n_layers,
-                                   d_out=d_numerical,
-                                   device=self.device,
-                                   activation_fun=self.activation_fun,
-                                   attention_dropout=attention_dropout)
+        # Create decoder
+        self.train_ = train
+        self.decoder = Decoder(input_dim=d_out,
+                               d_token=d_token,
+                               ffn_dim=ffn_dim,
+                               head_num=head_num,
+                               ffn_dropout=ffn_dropout,
+                               n_layers=n_layers,
+                               d_out=self.dim_numerical,
+                               device=self.device,
+                               activation_fun=self.activation_fun,
+                               attention_dropout=attention_dropout)
 
     def re_parameterize(self, mu, logvar):
-        if self.training:
+        if self.train_:
             std = logvar.mul(0.5).exp_()
             eps = Variable(std.data.new(std.size()).normal_())
             return eps.mul(std).add_(mu)
         else:
             return mu
 
-    def forward(self, x, decoder=False):
+    def forward(self, x):
+        # x_flatten = torch.flatten(x, start_dim=1)
 
         num_embeddings = self.numerical_embedding(x)
         num_embeddings = self.activation_fun(num_embeddings)
+
         transformed_embeddings = self.Transformer_layers(num_embeddings)
         activated_transformed_embeddings = self.activation_fun(transformed_embeddings)
 
-        out_vector_s = self.out_layer_m(activated_transformed_embeddings[:, 0, :])
-        out_vector_m = self.out_layer_s(activated_transformed_embeddings[:, 0, :])
-        z = self.re_parameterize(out_vector_s, out_vector_m)
-        if decoder:
+        out_vector_m = self.out_layer_m(activated_transformed_embeddings[:, 0, :])
+        out_vector_s = F.sigmoid(self.out_layer_s(activated_transformed_embeddings[:, 0, :]))
+
+        z = self.re_parameterize(out_vector_m, out_vector_s)
+
+        if self.train_:
             decoded = self.decoder(z)
-            return decoded, out_vector_s, out_vector_m
+            return decoded, out_vector_m, out_vector_s
 
-        return None, out_vector_s, out_vector_m
-
+        return None, out_vector_m, out_vector_s
