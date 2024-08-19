@@ -3,6 +3,21 @@ import os
 import numpy as np
 import pandas as pd
 
+def add_noise(df, noise_type='Gaussian '):
+    if noise_type.lower() == 'gaussian':
+        noise = np.random.normal(0,2, df.shape)
+    elif noise_type.lower() == 'impulse':
+        noise_sample = np.random.default_rng().uniform(0.3*df.min(), 0.3*df.max(), int(0.03*df.shape))
+        zeros = np.zeros(df.shape - noise.shape)
+        noise = np.concatenate([noise_sample, zeros])
+        np.random.shuffle(noise)
+
+    df = df + noise
+    return df
+
+def binary_flip_labels(df):
+    df['class'] = 1 - df['class']
+    return df
 
 def pre_process_adult_dataset(df):
 
