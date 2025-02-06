@@ -1,0 +1,30 @@
+<div class="container">
+    <div class="button-box col-lg-12">
+        <button type="button" class="btn btn-primary" onclick="window.location.href = '/display_op' ; ">Modelled Operator</button>
+    </div>
+
+    <form method="POST">
+        {{form.csrf_token}}
+        
+        {{form.sim_search_name.label( class="form-label")}}
+        {{form.sim_search_name(
+        class="form-control"
+        )}}
+        <br/>
+        {{form.sim_search_dir.label( class="form-label")}}
+        {{form.sim_search_dir(
+        class="form-control"
+        )}}
+        <br/>
+        {{form.select_avail_oper.label}}
+        <br/>
+        {{form.select_avail_oper(class="form-select form-select-lg mb-3")}}
+        <br/>
+        {{form.select_avail_vec_repr.label}}
+        <br/>
+        {{form.select_avail_vec_repr(class="form-select form-select-lg mb-3")}}
+        <br/>
+        <br/>
+        {{form.submit(class="btn btn-primary")}}
+      </form>
+</div>

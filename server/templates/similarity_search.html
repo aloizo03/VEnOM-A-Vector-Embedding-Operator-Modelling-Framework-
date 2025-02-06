@@ -1,0 +1,30 @@
+<div class="container" id="sim_search_cont1">
+    <div class="button-box col-lg-12">
+        <button type="button" class="btn btn-primary" onclick="window.location.href = '/display_sim_vecs' ; ">Display Similarity Search Vector Embedding Representation</button>
+    </div>
+    <form method="POST">
+        {{form.csrf_token}}
+        
+        {{form.sim_search_name.label( class="form-label")}}
+        {{form.sim_search_name(
+        class="form-control"
+        )}}
+        <br/>
+        {{form.pred_data_dir_path.label( class="form-label")}}
+        {{form.pred_data_dir_path(
+        class="form-control" 
+        )}}
+        <br/>
+        {{form.select_sim_search.label}}
+        <br/>
+        {{form.select_sim_search(class="form-select form-select-lg mb-3")}}
+        <!-- <br/> -->
+        <br/>
+        {{form.select_avail_vec_repr.label}}
+        <br/>
+        {{form.select_avail_vec_repr(class="form-select form-select-lg mb-3")}}
+        <br/>
+        <br/>
+        {{form.submit(class="btn btn-primary")}}
+      </form>
+</div>

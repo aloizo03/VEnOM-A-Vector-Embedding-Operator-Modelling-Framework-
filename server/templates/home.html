@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>VENOM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <body>
+    <div class="container">
+        <div class="button-box col-lg-12">
+            <!-- <button type="button" class="btn btn-primary" onclick="window.location.href = '/add_item' ; ">Load Data</button> -->
+            <button type="button" class="btn btn-primary" id="nav_buttons" onclick="window.location.href = '/onclick_load_data' ; ">Load Data</button>
+            <button type="button" class="btn btn-primary" id="nav_buttons" onclick="window.location.href = '/onclick_vec' ; ">Vectorisation</button>
+            <button type="button" class="btn btn-primary" id="nav_buttons" onclick="window.location.href = '/sim_search' ; ">Similarity Search</button>
+            <button type="button" class="btn btn-primary" id="nav_buttons" onclick="window.location.href = '/op_model' ; ">Operator Modelling</button>
+        </div>
+    </div>
+
+    {% if(page_name == "load_data") %} 
+      {% include 'load_data.html' %}
+    {%elif page_name == "vectorisation"%}
+        {% include 'vectorisation.html' %}
+    {%elif page_name == "display_vectors"%}
+        {% include 'display_vectors.html' %}
+    {%elif page_name == "display_sim_vectors"%}
+        {% include 'display_vectors.html' %}
+    {%elif page_name == "sim_search_vectors"%}
+        {% include 'sim_search_vectors.html' %}
+    {%elif page_name == "similarity_search" %}
+        {% include 'similarity_search.html' %}
+    {%elif page_name == "operator_modelling"%}
+        {% include 'op_modelling.html' %}
+    {%elif page_name == "operator_modelling_display"%}
+        {% include 'op_modelling_display.html' %}
+    {% else %} 
+    <div class="container" id="empty_cont">
+
+
+    </div>    
+    {% endif %} 
+
+    
+  </body>
+</html>

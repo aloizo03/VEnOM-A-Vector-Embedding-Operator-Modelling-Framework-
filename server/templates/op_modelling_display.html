@@ -1,0 +1,19 @@
+<div class="container" id="display_win">
+   <form method="POST">
+    {{form.csrf_token}}
+    {{form.avail_op_models.label}}
+    <br/>
+    {{form.avail_op_models(class="form-select form-select-lg mb-3")}}
+    {{form.submit(class="btn btn-primary")}}
+  </form>
+  
+    {% if(display_plot == "True") %} 
+    <br/>
+    
+    <div class="container" id="display_graph">    
+      <h2>Operator Modelling Prediction Results</h2>
+      <img src="data:image/png;base64, {{ plot_url }}">
+    </div>
+  {% endif %}
+</div>
+

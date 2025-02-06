@@ -47,7 +47,7 @@ class Decoder(nn.Module):
         z_out = self.input_layer_dec(z)
         z_out = self.activation_fun(z_out)
         z_transform = self.Transformer_layers(z_out)
-
+        
         decoded = self.out_layer_dec(self.activation_fun(z_transform))
 
         return decoded
@@ -108,7 +108,6 @@ class Embedding_Transformer_Layers(nn.Module):
 
         return encoded_embd
 
-
 # Will be used from
 class Numerical_Embedding(nn.Module):
     def __init__(self, dim, dim_numerical, d_tokens, activation, bias=True, device='cuda'):
@@ -117,6 +116,7 @@ class Numerical_Embedding(nn.Module):
 
         # Embeddings
         self.weights = nn.Parameter(torch.randn(dim_input, dim, device=device))
+        print(self.weights.shape)
         self.bias = nn.Parameter(torch.randn(dim_input, dim, device=device)) if bias else None
 
         self.activation = activation
@@ -164,7 +164,7 @@ class Num2Vec(nn.Module):
 
         super().__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+        
         self.distribution = distribution
 
         self.dim_numerical = d_numerical
@@ -226,7 +226,7 @@ class Num2Vec(nn.Module):
 
         num_embeddings = self.numerical_embedding(x)
         num_embeddings = self.activation_fun(num_embeddings)
-
+        
         transformed_embeddings = self.Transformer_layers(num_embeddings)
         activated_transformed_embeddings = self.activation_fun(transformed_embeddings)
 
@@ -237,6 +237,7 @@ class Num2Vec(nn.Module):
 
         if self.train_:
             decoded = self.decoder(z)
+            # TODO: Add to return the z so add to the loss function 
             return decoded, out_vector_m, out_vector_s
 
         return None, out_vector_m, out_vector_s

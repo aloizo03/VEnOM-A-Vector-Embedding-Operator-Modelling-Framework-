@@ -1,0 +1,50 @@
+.button-box {
+    /* text-align:center; */
+    margin-top:20px;
+    margin-bottom:20px;
+    margin-left: 15px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    /* background-color: #b303aa; */
+ }
+
+ .btn-primary, .btn-primary:hover, .btn-primary:active, .btn-primary:visited {
+    background-color: #b303aa;
+    border-color: #b303aa;
+}
+
+#nav_buttons{
+    background-color: #c0c0c0;
+    border-color: #c0c0c0;
+}
+
+.btn-primary:active{background-color: #f3baf0;}
+
+#vectorisation_cont2 #input_id{
+    text-align:center;
+    margin-top:20px;
+    margin-bottom: 5px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
+
+.form-class #loadData #sim_search_cont1{
+    text-align:center;
+    margin-top:20px;
+    margin-bottom: 5px;
+}
+
+#display_vecs{
+    text-align:center;
+}
+
+#display_win {
+  position: relative;
+  left: 20%;
+ }
+
+ #display_graph {
+    position: relative;
+    right: 15%;
+}
+

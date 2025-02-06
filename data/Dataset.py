@@ -59,8 +59,10 @@ class DataBuilder(data.Dataset):
         if self.ret_table:
             row_tuples = self.dataset_tuples[idx]
 
-            tuples = row_tuples[self.columns[idx]].values
-
+            if self.ret_labels:
+                tuples = row_tuples.values
+            else:
+                tuples = row_tuples[self.columns[idx]].values
             # if tuples.shape[0] < self.k_dim:
             #     zero_pad = np.zeros(shape=(self.k_dim, tuples.shape[1]))
             #     zero_pad[:tuples.shape[0], :] = tuples
@@ -83,17 +85,7 @@ class DataBuilder(data.Dataset):
 
         if self.ret_labels:
             if self.ret_all_dataset:
-                class_labels = self.labels_class_columns[idx]
-                class_tuple = row_tuples[class_labels].values.tolist()
-                class_tuple_np = np.asarray(class_tuple, dtype=np.float64)
-                if self.normalise_data:
-                    if len(class_tuple_np.shape) < 2:
-                        class_tuple_np = preprocessing.normalize([class_tuple_np])[0]
-                    else:
-                        class_tuple_np = preprocessing.normalize(class_tuple_np)
-
-                ret_tuples = np.concatenate((tuples_np, class_tuple_np), axis=1)
-                return ret_tuples
+                return tuples_np
             else:
                 class_tuple = row_tuples[self.labels_class_columns].values.flatten().tolist()
                 class_tuple_np = np.asarray(class_tuple, dtype=np.float64)
@@ -111,7 +103,7 @@ class DataBuilder(data.Dataset):
 class DataBuilder_Pipeline(data.Dataset):
 
     def __init__(self, datasets_filepaths, norm=True, ret_Table=True, ret_label=False, k_dim=5, ret_all_dataset=True,
-                 create_operator=False, ret_class=False):
+                 create_operator=False, ret_class=False, Vectors=None):
         self.datasets_data = []
         self.datasets_filename = datasets_filepaths
         self.norm = norm
@@ -125,6 +117,7 @@ class DataBuilder_Pipeline(data.Dataset):
         self.ret_all_dataset = ret_all_dataset
 
         self.create_operator = create_operator
+        self.vectors = Vectors
 
         if type(self.datasets_filename) is list:
             self.idx_to_filename = {idx: filename for idx, filename in enumerate(self.datasets_filename)}
@@ -150,6 +143,7 @@ class DataBuilder_Pipeline(data.Dataset):
             self.idx_to_filename = {idx: filename for idx, filename in enumerate([self.datasets_filename])}
 
             if self.create_operator:
+                # print(self.datasets_filename)
                 self.datasets_data = pd.read_csv(self.datasets_filename)
                 self.data_len = self.datasets_data.shape[0]
             else:
@@ -165,14 +159,184 @@ class DataBuilder_Pipeline(data.Dataset):
     def get_dataset_name(self, idx):
         return self.idx_to_filename[idx]
 
+    def get_all_data_sr(self, query='last'):
+        vectors_list = []
+        labels_list = []
+
+        if query == 'last':
+            if type(self.datasets_data is list):
+                for data_, vector_ in zip(self.datasets_data, self.vectors):
+                    dataset_data = data_.dropna()
+                    class_labels = dataset_data.loc[:, data_.columns.str.startswith("class")]
+                    last_class_label = class_labels.tail(1)
+
+                    vectors_list.append(vector_)
+                    labels_list.append(last_class_label)
+
+        vec_np = np.asarray(vectors_list)
+        label_np = np.asarray(labels_list)
+
+        label_np = label_np.reshape(-1, 1)
+        print(label_np.shape)
+        return vec_np, label_np
+
+        # dataset_data = data_.dropna()
+        # class_labels =  dataset_data.loc[:, data_.columns.str.startswith("class")]
+        #             row_tuples =  dataset_data.drop(columns=list(class_labels.columns))
+
+        #             last_row_np = np.asarray(row_tuples.tail(1), dtype=np.float64)
+        #             last_class_label = np.asarray(class_labels.tail(1), dtype=np.float64)
+
+        #             row_tuples = row_tuples.drop(row_tuples.index[len(row_tuples)-1])
+        #             class_labels = class_labels.drop(class_labels.index[len(class_labels)-1])
+
+        #             class_labels = np.asarray(class_labels, dtype=np.float64)
+
+        #             tuples_np = np.asarray(row_tuples, dtype=np.float64)
+        #             tuples_np = np.nan_to_num(tuples_np)
+
+        #             if self.norm:
+        #                 tuples_np = preprocessing.normalize(tuples_np)
+        #                 last_row_np =  preprocessing.normalize(last_row_np)
+
+        #             ret_array.append(tuples_np)
+        #             ret_array_label.append(class_labels)
+
+    def get_all_data_per_dataset(self, query='last', concat=True):
+        data_set_lst = []
+        labels_lst = []
+
+        last_row_data_lst = []
+        last_label_lst = []
+
+        dataset_name = []
+
+        output_ = 1
+        for i, dataset_ in enumerate(self.datasets_data):
+            if query == 'last':
+                dataset_data = dataset_.dropna()
+                class_labels = dataset_data.loc[:, dataset_data.columns.str.startswith("class")]
+                row_tuples = dataset_data.drop(columns=list(class_labels.columns))
+
+                last_row_np = np.asarray(row_tuples.tail(1), dtype=np.float64)
+                last_class_label = np.asarray(class_labels.tail(1), dtype=np.float64)
+
+                row_tuples = row_tuples.drop(row_tuples.index[len(row_tuples) - 1])
+                class_labels = class_labels.drop(class_labels.index[len(class_labels) - 1])
+
+                class_labels = np.asarray(class_labels, dtype=np.float64)
+                tuples_np = np.asarray(row_tuples, dtype=np.float64)
+                tuples_np = np.nan_to_num(tuples_np)
+
+                if self.norm:
+                    tuples_np = preprocessing.normalize(tuples_np)
+                    last_row_np = preprocessing.normalize(last_row_np)
+
+                data_set_lst.append(row_tuples)
+                labels_lst.append(class_labels)
+
+                last_row_data_lst.append(last_row_np)
+                last_label_lst.append(last_class_label)
+            elif query == 'all':
+                dataset_data = dataset_.dropna()
+                class_labels = dataset_data.loc[:, dataset_data.columns.str.startswith("class")]
+                row_tuples = dataset_data.drop(columns=list(class_labels.columns))
+
+                class_labels = np.asarray(class_labels, dtype=np.float64)
+                tuples_np = np.asarray(row_tuples, dtype=np.float64)
+                tuples_np = np.nan_to_num(tuples_np)
+
+                if self.norm:
+                    tuples_np = preprocessing.normalize(tuples_np)
+
+                data_set_lst.append(dataset_data)
+                labels_lst.append(class_labels)
+
+                output_ = np.maximum(class_labels.shape[0], output_)
+            elif query == 'None':
+                dataset_data = dataset_.dropna()
+                class_labels = dataset_data.loc[:, dataset_data.columns.str.startswith("class")]
+                row_tuples = dataset_data.drop(columns=list(class_labels.columns))
+
+                class_labels = np.asarray(class_labels, dtype=np.float64)
+                tuples_np = np.asarray(row_tuples, dtype=np.float64)
+                tuples_np = np.nan_to_num(tuples_np)
+                if self.norm:
+                    tuples_np = preprocessing.normalize(tuples_np)
+
+                data_set_lst.append(dataset_data)
+            dataset_name.append(self.get_dataset_name(i))
+        if concat:
+            ret_array_np = np.concatenate(data_set_lst, axis=0)
+            ret_array_labels_np = np.concatenate(labels_lst, axis=0)
+        else:
+            ret_array_np = data_set_lst
+            ret_array_labels_np = labels_lst
+
+        if len(last_row_data_lst) >= 1:
+            ret_lr_array_np = np.concatenate(last_row_data_lst, axis=0)
+            ret_lr_array_labels_np = np.concatenate(last_label_lst, axis=0)
+        else:
+            ret_lr_array_np = None
+            ret_lr_array_labels_np = None
+
+        return ret_array_np, ret_array_labels_np, ret_lr_array_np, ret_lr_array_labels_np, dataset_name, output_
+
+    def get_all_dataset_data_sr(self, query='last', label_files=None):
+        vectors_list = []
+        labels_list = []
+        idx = 0
+        output_ = 11111111
+        # print(output_)
+        for data_, vector_ in zip(self.datasets_data, self.vectors):
+            dataset_name = self.get_dataset_name(idx=idx)
+
+            if label_files is not None:
+                label_ = label_files.loc[label_files['Dataset Name'] == dataset_name]['Y']
+                labels_list.append(label_)
+            else:
+                if query == 'last':
+                    dataset_data = data_.dropna()
+                    class_labels = dataset_data.loc[:, dataset_data.columns.str.startswith("class")]
+                    last_class_label = class_labels.tail(1)
+                    labels_list.append(last_class_label)
+                elif query == 'all':
+                    dataset_data = data_.dropna()
+                    class_labels = dataset_data.loc[:, dataset_data.columns.str.startswith("class")]
+                    output_ = np.minimum(class_labels.shape[0], output_)
+                    labels_list.append(class_labels)
+
+            vectors_list.append(vector_)
+            idx += 1
+
+        if query == 'all':
+            for i, labels_ in enumerate(labels_list):
+                if labels_.shape[0] > output_:
+                    for j in range(np.abs(labels_.shape[0] - output_)):
+                        labels_list[i] = labels_list[i].drop(labels_list[i].index[len(labels_list[i]) - 1])
+                        # labels_list[i] = np.asarray(labels_list[i]).reshape(-1, 1)
+
+        vec_np = np.asarray(vectors_list)
+        label_np = np.asarray(labels_list)
+        if query == 'last':
+            label_np = label_np.reshape(-1, 1)
+        elif query == 'all':
+            label_np = label_np.reshape(label_np.shape[0], label_np.shape[1])
+        # elif query == 'all':
+        #     label_np = label_np.reshape(-1, 1, 1)
+        print(label_np.shape)
+        return vec_np, label_np
+
     def get_all_dataset_data(self):
         if self.create_operator:
-            class_labels = self.datasets_data.loc[:, self.datasets_data.columns.str.contains("class")]
-            row_tuples = self.datasets_data.drop(columns=list(class_labels.columns))
+            dataset_data = self.datasets_data.dropna()
+            class_labels = dataset_data.loc[:, self.datasets_data.columns.str.startswith("class")]
+            row_tuples = dataset_data.drop(columns=list(class_labels.columns))
         else:
             df = pd.DataFrame()
             for df_data in self.datasets_data:
                 df = pd.concat([df, df_data])
+            df = df.dropna()
             class_labels = df.loc[:, df.columns.str.contains("class")]
             row_tuples = df.drop(columns=list(class_labels.columns))
 
@@ -264,8 +428,8 @@ class DataBuilder_Pipeline(data.Dataset):
 
 class Pipeline_Dataset:
 
-    def __init__(self, data_path, norm=True, ret_table=True, ret_label=False, k_dim=50, ret_all_dataset=True,
-                 create_operator=False, ret_class=False):
+    def __init__(self, data_path, norm=True, ret_table=True, ret_label=True, k_dim=50, ret_all_dataset=True,
+                 create_operator=False, ret_class=False, Vectors=None):
         self.datasets_path = data_path
         self.norm = norm
 
@@ -275,6 +439,8 @@ class Pipeline_Dataset:
         self.ret_label = ret_label
         self.ret_class = ret_class
         self.create_operator = create_operator
+
+        self.vectors = Vectors
 
         self.ret_all_dataset = ret_all_dataset
 
@@ -296,7 +462,8 @@ class Pipeline_Dataset:
                                     k_dim=self.k_dim,
                                     norm=self.norm,
                                     create_operator=self.create_operator,
-                                    ret_class=self.ret_class)
+                                    ret_class=self.ret_class,
+                                    Vectors=self.vectors)
 
 
 class Dataset:
@@ -311,6 +478,7 @@ class Dataset:
         self.augmentation = augment
         self.ret_all_dataset = ret_all_dataset
         self.ret_tables = True
+        self.return_labels = True
         self.ret_table = ret_table
         if self.ret_all_dataset:
             self.k_dim = 0
@@ -457,6 +625,7 @@ class Dataset:
                                            k_dim=self.k_dim,
                                            ret_all_dataset=self.ret_all_dataset)
         else:
+            print('in')
             dataset_path = self.datasets_dict[dataset_name]['path']
             tuples_columns = self.datasets_dict[dataset_name]['columns']
             class_columns = self.datasets_dict[dataset_name]['class']
@@ -481,7 +650,7 @@ class Dataset:
                                             dir_path=None,
                                             columns=tuples_columns,
                                             labels=class_columns,
-                                            col_idx=val_idx,
+                                            col_idx=test_idx,
                                             norm=self.normalise_data,
                                             ret_table=self.ret_table,
                                             k_dim=self.k_dim,

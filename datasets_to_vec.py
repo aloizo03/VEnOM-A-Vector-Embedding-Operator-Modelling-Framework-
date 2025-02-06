@@ -3,6 +3,8 @@ from utils_.vectors import Vectorise
 from utils_.utils import check_path
 import os
 
+# python datasets_to_vec.py --model-weight "/opt/dlami/nvme/Vector Embedding/results/Opt_Adam_HPC_in_all_dataset_tuples_e200_v300/weights/best.pt" --data-input "data/train_data_big_dataset" --out-path "results/test_big_datasets/" --batch-size 8
+# python select_data.py --model-weight "/opt/dlami/nvme/Vector Embedding/results/Opt_Adam_HPC_in_all_dataset_e200_v300/weights/best.pt" --data-input "data/test_big_data/dataset_0_286.csv" --out-path "results/test_big_datasets" --vectors "results/test_big_datasets/vectors_1723" --data-selection 'distance'
 
 def main():
     parser = argparse.ArgumentParser()
@@ -10,7 +12,7 @@ def main():
     parser.add_argument("-i", "--data-input", type=str, help="Input datasets path f.e data/path/dir")
     parser.add_argument("-out", "--out-path", type=str, default="results/test",
                         help='Output path for the saving of the embeddings')
-    parser.add_argument('-bz', '--batch-size', type=int, default=8, help='total batch size')
+    parser.add_argument('-bz', '--batch-size', type=int, default=1, help='total batch size')
 
     args = parser.parse_args()
 
@@ -27,4 +29,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 

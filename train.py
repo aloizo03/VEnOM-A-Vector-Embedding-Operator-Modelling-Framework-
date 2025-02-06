@@ -7,6 +7,8 @@ from utils_.utils import check_path
 import os
 
 
+# todo: check outpath if exists (Done i think)
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--data-config", type=str, help="Input datasets path")

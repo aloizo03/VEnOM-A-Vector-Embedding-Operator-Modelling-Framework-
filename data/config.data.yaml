@@ -32,11 +32,21 @@
 #  class: ["quality"]
 
 Household_power_consumption:
-  path: "C:/Users/antre/PycharmProjects/Vector Embedding/data/Household Power Consumption/"
+  path: "data/HPC_2Krows/train"
   columns: [ "Global_active_power", "Global_reactive_power", "Voltage", "Global_intensity", "Sub_metering_1", "Sub_metering_2" ]
   class: [ "class" ]
 
 Weather:
-  path: "C:/Users/antre/PycharmProjects/Vector Embedding/data/weather_small_sample"
-  columns: ["min_temp_c","max_temp_c","precipitation_mm","snow_depth_mm","avg_wind_dir_deg","avg_wind_speed_kmh","peak_wind_gust_kmh","avg_sea_level_pres_hpa","sunshine_total_min" ]
-  class: [ "avg_temp_c" ]
+  path: "data/Weather/train"
+  columns: ['humidity','pressure','temperature','wind_direction','wind_speed','weather_condition',]
+  class: [ "class" ]
+
+Adult:
+  path: "data/Adult/train"
+  columns: ['age','workclass','fnlwgt','educational-num','marital-status','occupation','relationship','race','gender','capital-gain','capital-loss','hours-per-week','native-country']
+  class: [ "class" ]
+
+Stock:
+  path: "data/Stock/train"
+  columns: ['Open', 'High', 'Low', 'Adj Close', 'Volume']
+  class: [ "class" ]

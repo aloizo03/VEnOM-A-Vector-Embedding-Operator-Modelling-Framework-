@@ -333,8 +333,7 @@ class Trainer:
             for epoch in range(start_epoch, self.num_of_epochs):
                 epoch_loss = 0
 
-                train_dataloader = DataLoader(train_databuilder, batch_size=self.batch_size, shuffle=True,
-                                              collate_fn=collator_fn)
+                train_dataloader = DataLoader(train_databuilder, batch_size=self.batch_size, shuffle=True, collate_fn=collator_fn)
 
                 self.model.train(mode=True)
 
@@ -345,7 +344,7 @@ class Trainer:
                 for batch_idx, batch_data in enumerate(train_dataloader):
                     batch_data = batch_data.to(self.device)
                     self.optimiser_.zero_grad()
-
+                    
                     recon_batch, mu, logvar = self.model(batch_data)
                     recon_batch = recon_batch[:, :batch_data.shape[1]]
 
@@ -371,8 +370,7 @@ class Trainer:
                 MSE_loss_values.append(total_MSE_loss)
                 KLD_loss_values.append(total_KLD_loss)
 
-                val_dataloader = DataLoader(val_databuilder, batch_size=self.batch_size, shuffle=False,
-                                            collate_fn=collator_fn)
+                val_dataloader = DataLoader(val_databuilder, batch_size=self.batch_size, shuffle=False, collate_fn=collator_fn)
 
                 val_loss, val_MSE_loss, val_KLD_loss = self.test(val_dataloader)
                 loss_values_val.append(val_loss)
@@ -412,7 +410,7 @@ class Trainer:
             for dataset_idx, dataset_name in enumerate(self.datasets.datasets_dict.keys()):
                 train_databuilder, test_data_builder, val_databuilder = self.datasets.get_Dataset_dataloader(
                     dataset_name=dataset_name, all_datasets=False)
-                test_dataloader = DataLoader(test_data_builder, batch_size=self.batch_size, shuffle=True)
+                test_dataloader = DataLoader(test_data_builder, batch_size=self.batch_size, shuffle=True, collate_fn=collator_fn)
                 loss, MSE_loss, KLD_loss = self.test(dataloader=test_dataloader)
                 test_loss_out += (f'Dataset name: {dataset_name},'
                                   f'  MSE loss: {MSE_loss},'

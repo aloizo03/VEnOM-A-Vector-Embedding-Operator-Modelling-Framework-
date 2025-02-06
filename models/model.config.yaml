@@ -1,7 +1,7 @@
-num_layers : 16
-input_dim: 20
-d_token: 300
-head_num: 5
+num_layers : 10
+input_dim: 30
+d_token: 256
+head_num: 8
 attention_hidden_dim: 1024
 attention_type_of_layer: "Pre-LN"
 attention_dropout: 0.1
@@ -12,8 +12,22 @@ activation: "relu"
 weight_decay: 0.1
 momentum: 0.8
 lrf: 0.1
-mlp_hidden_dim: 64
 
 read_all_dataset: True
 table_train: True
 dim_k: 100
+
+#num_layers : 1
+#d_token: 40
+#head_num: 1
+#attention_hidden_dim: 64
+#attention_type_of_layer: "Pre-LN"
+#attention_dropout: 0.2
+#ffn_dropout: 0.2
+#ffn_dim: 128
+#d_out: 10
+#activation: "relu"
+#weight_decay: 0.3
+#momentum: 0.8
+#lrf: 0.1
+#mlp_hidden_dim: 64

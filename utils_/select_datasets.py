@@ -1,3 +1,4 @@
+
 import torch
 from models.vectorEmbedding import Num2Vec
 from data.Dataset import Pipeline_Dataset
@@ -17,7 +18,8 @@ from sklearn.metrics import silhouette_score
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 
-from utils_.utils import calculate_cosine_similarity, get_cmap
+
+from utils_.utils import calculate_cosine_similarity
 import os
 
 logger = logging.getLogger(__name__)
@@ -63,8 +65,9 @@ class Data_selection:
         self.output_path = out_path
 
         self.vectors = self.load_dict(vectors_path)
-
-        logging.basicConfig(filename=os.path.join(self.output_path, 'log_file.log'), encoding='utf-8',
+    
+        logging.basicConfig(filename=os.path.join(self.output_path, 'log_file.log'),
+                            encoding='utf-8',
                             level=logging.DEBUG)
         logger.setLevel(logging.INFO)
 
@@ -77,7 +80,7 @@ class Data_selection:
         for n_clusters in num_of_clusters:
             clusterer = KMeans(n_clusters=n_clusters, random_state=10)
             cluster_labels = clusterer.fit_predict(datasets_vectors)
-
+            
             labels_list.append(cluster_labels)
 
             silhouette_avg = silhouette_score(datasets_vectors, cluster_labels)
@@ -94,14 +97,18 @@ class Data_selection:
             label = best_cluster.predict([vector])[0]
             selected_data_idx = [i for i, label_ in enumerate(best_labels) if label_ == label]
             selected_datanames = [dataset_name for i, dataset_name in enumerate(vect_dict) if i in selected_data_idx]
-            out_dict[dataset_name] = selected_datanames
+            sel_vectors = [vec for filename_, vec in self.vectors.items() if filename_ in selected_datanames]
+    
+            out_dict[dataset_name] = [selected_datanames, sel_vectors]
 
+        out_dict = {'selected_dataset': out_dict,
+                    'Pred_Dataset': vectors}
         return out_dict
 
     def compute_similarity(self, vect_dict, vectors):
         out_dict = {}
         for dataset_name, vector_1 in vectors.items():
-            tmp_dict = {}
+            tmp_dict ={}
             for dataset_name_2, vector_2 in vect_dict.items():
                 sim_ = calculate_cosine_similarity(a=vector_1,
                                                    b=vector_2)
@@ -112,38 +119,43 @@ class Data_selection:
         return out_dict
 
     def compute_distance(self, vect_dict, vectors):
+        # Euclidean distance
         out_dict = {}
         for dataset_name, vector_1 in vectors.items():
-            tmp_dict = {}
+            tmp_dict ={}
             for dataset_name_2, vector_2 in vect_dict.items():
                 dist_ = np.linalg.norm(vector_1 - vector_2)
                 tmp_dict[dataset_name_2] = dist_
             out_dict[dataset_name] = tmp_dict
         return out_dict
-
+    
     def select_random(self, vect_dict, vectors, ratio=0.3):
         out_dict = {}
         for dataset_name, vector_1 in vectors.items():
             filenames_list = list(vect_dict.keys())
-            selected_data = np.random.choice(filenames_list, np.int_(np.floor(len(filenames_list) * ratio)),
-                                             replace=False)
+            selected_data = np.random.choice(filenames_list, np.int_(np.floor(len(filenames_list) * ratio)), replace=False)
             out_dict[dataset_name] = selected_data.tolist()
 
         return out_dict
 
-    def select_most_relevants_data(self, dict_, ratio=0.3, compare='min'):
+    def select_most_relevants_data(self, dict_, vectors, ratio=0.3, compare='desc'):
+        #Todo: select the most K-relevant dataset
         ret_dict = {}
         for dataset_name, data_dict in dict_.items():
-            most_relevant = []
-            for data_name, value_ in data_dict.items():
-                if compare == 'min':
-                    if value_ < ratio:
-                        most_relevant.append(data_name)
-                else:
-                    if value_ > ratio:
-                        most_relevant.append(data_name)
-            ret_dict[dataset_name] = most_relevant
 
+            if compare.lower() == 'desc':
+                data_dict_sorted = {k: v for k, v in sorted(data_dict.items(), key=lambda x: x[1], reverse=False)}
+            else:
+                data_dict_sorted = {k: v for k, v in sorted(data_dict.items(), key=lambda x: x[1], reverse=True)}
+
+            datasets_filenames = list(data_dict_sorted.keys())
+            top_k = int(len(datasets_filenames) * ratio)
+            sel_dataset = datasets_filenames[:top_k]
+            sel_vectors = [vec for filename_, vec in self.vectors.items() if filename_ in sel_dataset]
+
+            ret_dict[dataset_name] = [datasets_filenames, sel_vectors]
+        ret_dict = {'selected_dataset': ret_dict,
+                    'Pred_Dataset': vectors}
         return ret_dict
 
     def save_dict(self, dict_, filename):
@@ -163,8 +175,7 @@ class Data_selection:
             out_data[dataset_name] = vector
         return out_data
 
-    def plot_representation(self, dict_vectors, new_vectors_, new_dataset_names, dataset_builder, most_relevant,
-                            ratio=0.3):
+    def plot_representation(self, dict_vectors, new_vectors_, new_dataset_names, dataset_builder, most_relevant, ratio=0.3):
         colors_lst = list(colors.TABLEAU_COLORS.keys())
         plt.set_loglevel('info')
 
@@ -175,30 +186,32 @@ class Data_selection:
             data_name = dataset_builder.get_dataset_name(data_idx)
             most_rel = most_relevant[data_name]
             vec_np = np.array(list(dict_vectors.values()))
-
+            
             labels_ = ['Relevant Dataset' if i in most_rel else 'Data Lake' for i in dict_vectors.keys()]
             # colors_ = [colors_lst[data_idx] if i in most_rel else 'blueviolet' for i in dict_vectors.keys()]
-
+            
+            
             vec_concat_np = np.concatenate((vec_np, [new_vector_]), axis=0)
 
             pca = PCA(n_components=3)
             result = pca.fit_transform(vec_concat_np)
             unique = list(set(labels_))
             for i, u in enumerate(unique):
+
                 vec_ = [result[j, :] for j in range(len(labels_)) if labels_[j] == u]
                 np_arr_vec = np.asarray(vec_, dtype=np.float64)
-
+           
                 ax.scatter(np_arr_vec[:, 0], np_arr_vec[:, 1], np_arr_vec[:, 2], c=colors_lst[i], label=u)
-            ax.scatter(result[vec_np.shape[0]:, 0], result[vec_np.shape[0]:, 1], result[vec_np.shape[0]:, 2],
-                       c='purple', label='New Data')
-
+            ax.scatter(result[vec_np.shape[0]:, 0], result[vec_np.shape[0]:, 1], result[vec_np.shape[0]:, 2], c='purple', label='New Data')
+                
         ax.legend()
         ax.grid(True)
 
         ax.set(xlabel=(r' $x$'), ylabel=(r'$y$'), zlabel=(r'$z$'))
         plt.savefig(os.path.join(self.output_path, 'plot_representation_2.png'), dpi=100)
 
-    def find_relevant_datasets(self, type_of_selection):
+
+    def find_relevant_datasets(self, type_of_selection, data_ratio_selection):
 
         DataBuilder = self.dataset.get_Dataloader()
         dataloader = DataLoader(DataBuilder, batch_size=1, shuffle=False)
@@ -208,48 +221,59 @@ class Data_selection:
 
         self.model.eval()
         total_data = 0
-        for batch_idx, batch_ in enumerate(dataloader):
-            features_, dataset_idx = batch_
-            features_ = features_.to(self.model.device)
-            # _, vectors, logvar = self.model(features_)
-            _, vectors, _ = self.model(features_)
 
-            vectors_output.append(vectors.detach().cpu().numpy())
-            vectors_dataset_idx.append(dataset_idx.numpy())
+        start_time = time.time()
+        with torch.no_grad():
+            for batch_idx, batch_ in enumerate(dataloader):
+                
+                features_, dataset_idx = batch_
+                features_ = features_.to(self.model.device)
+                
+                _, vectors, _ = self.model(features_)
+
+                vectors_output.append(vectors.detach().cpu().numpy())
+                vectors_dataset_idx.append(dataset_idx.numpy())
+                del vectors, features_
+                torch.cuda.empty_cache()
 
         vectors_out_tensors = np.concatenate(vectors_output, axis=0)
         vectors_dataset_idx_tensors = np.concatenate(vectors_dataset_idx, axis=0)
-
+        
         datasets_dict = self.convert_vectors_to_out_list(data_builder=DataBuilder,
                                                          vectors=vectors_out_tensors,
                                                          vectors_dataset_idx=vectors_dataset_idx_tensors)
-        if type_of_selection.lower() == 'similarity':
+        # print(datasets_dict)
+        if type_of_selection.lower() == 'cosine':
             compute_data = self.compute_similarity(vect_dict=self.vectors,
                                                    vectors=datasets_dict)
             most_relevant_data = self.select_most_relevants_data(dict_=compute_data,
-                                                                 ratio=0.5,
-                                                                 compare='max')
+                                                                 ratio=data_ratio_selection,
+                                                                 vectors=datasets_dict,
+                                                                 compare='asc')    
+                   
         elif type_of_selection.lower() == 'distance':
             compute_data = self.compute_distance(vect_dict=self.vectors,
                                                  vectors=datasets_dict)
+
             most_relevant_data = self.select_most_relevants_data(dict_=compute_data,
-                                                                 ratio=0.1,
-                                                                 compare='min')
+                                                                 ratio=data_ratio_selection,
+                                                                 vectors=datasets_dict,
+                                                                 compare='desc')
         elif type_of_selection.lower() == 'random':
             most_relevant_data = self.select_random(vect_dict=self.vectors, vectors=datasets_dict)
         elif type_of_selection.lower() == 'k-means':
             most_relevant_data = self.compute_KMeans_cluster(vect_dict=self.vectors, vectors=datasets_dict)
-        elif type_of_selection.lower() == 'h-clustering':
-            pass
+        # elif type_of_selection.lower() == 'h-clustering':
+        #     pass  
         else:
-            AssertionError('Wrong type of dataset selection!!')
+            raise AssertionError('Wrong type of dataset selection!!')
 
-        logging.info(f'The most relevant dataset: {most_relevant_data}')
-
+        # log.info(f'The most relevant dataset: {most_relevant_data}')
+        logger.info(f'Execution time for {type_of_selection} : {time.time() - start_time}')
         self.plot_representation(dict_vectors=self.vectors,
-                                 most_relevant=most_relevant_data,
+                                 most_relevant=most_relevant_data['selected_dataset'],
                                  new_dataset_names=vectors_dataset_idx_tensors,
-                                 dataset_builder=DataBuilder,
-                                 new_vectors_=vectors_out_tensors, )
-
+                                 dataset_builder=DataBuilder, 
+                                 new_vectors_=vectors_out_tensors,)
+        
         self.save_dict(dict_=most_relevant_data, filename=type_of_selection.lower())

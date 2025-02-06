@@ -17,6 +17,7 @@ def split_sub_tables(df, chunk_size):
 
 
 def collator_fn(data):
+    # TODO: Make to stack data with different dimensional inputs
     max_dim_rows = np.max([d.shape[0] for d in data])
     max_dim_col = np.max([d.shape[1] for d in data])
     reshape_data = []
@@ -33,8 +34,6 @@ def collator_fn(data):
 
 
 def transformation_binary(tuples):
-    print(tuples)
     tuples_set = set(tuples.tolist())
-    print(tuples_set)
     transform_tuples = [int(x) for x in tuples]
     return transform_tuples

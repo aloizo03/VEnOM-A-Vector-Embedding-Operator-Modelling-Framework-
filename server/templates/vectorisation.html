@@ -1,0 +1,39 @@
+<div class="button-box col-lg-12" id="vectorisation_cont1">
+    <button type="button" class="btn btn-primary" onclick="window.location.href = '/display_vecs' ; ">Display Vector Embedding Representation</button>
+  </div>
+  <div class="container" id="vectorisation_cont2">
+    <!-- <select class="form-select form-select-lg mb-3" aria-label=".form-select-lg example">
+      <option selected>Select Dataset</option>
+      {% for data_ in datasets_ %}
+          <option value="1">{{data_}}</option>
+      {% endfor %}
+    </select>
+    <br />
+    <br />
+    <select class="form-select form-select-lg mb-3" aria-label=".form-select-lg example">
+      <option selected>Select Vector Size</option>
+      {% for vec_ in vec_sizes %}
+          <option value="1">{{vec_}}</option>
+      {% endfor %}
+    </select>
+    <br/>
+    <br />
+    <button type="button" class="btn btn-primary">Create Vectorisation</button> -->
+
+    <form method="POST">
+      {{form.csrf_token}}
+      {{form.select_dataset.label}}
+      {{form.select_dataset(class="form-select form-select-lg mb-3")}}
+      <br/>
+      <br/>
+      {{form.select_vec_size.label}}
+      {{form.select_vec_size(class="form-select form-select-lg mb-3")}}
+      <br/>
+      <br/>
+      {{form.save_into.label}}
+      {{form.save_into(class="form-select form-select-lg mb-3")}}
+      <br/>
+      <br/>
+      {{form.submit(class="btn btn-primary")}}
+    </form>
+</div>
