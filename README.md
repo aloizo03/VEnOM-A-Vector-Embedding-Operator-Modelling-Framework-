@@ -21,9 +21,18 @@ For a NumTabData2Vec model first you have to denote the dataset in "data/config.
 </br>
 </br>
 Model training:
+
+For tabular data:
+
 ```
 $ python train.py --data-config data/config.data.yaml --model-config models/model.config.yaml --epochs 100 --out-path "results/model_training" --optimiser Adam --learning-rate 0.0005 --lr-scheduler --batch-size 4
 ```
+
+For graph:
+```
+$ python train_graph2vec.py -i "/data/graphs_edgelist" --out "/results/graph_model" -e 10 -vec 256
+```
+
 </br>
 When the model is trained you can use the framework:
 
