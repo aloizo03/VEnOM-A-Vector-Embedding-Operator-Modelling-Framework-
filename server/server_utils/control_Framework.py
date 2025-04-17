@@ -24,6 +24,13 @@ class control_Framework:
         self.save_Vectors = None
         self.Vectorise = None
 
+        if scores_out_file is not None:
+            if not os.path.exists(scores_out_file):
+                os.makedirs(scores_out_file)
+        if operators_out_file is not None:
+            if not os.path.exists(operators_out_file):
+                os.makedirs(operators_out_file)
+
     def set_selected_datasets(self, selected_Dataset):
         self.dataset_name = selected_Dataset
 
@@ -194,7 +201,5 @@ class Operator_Modelling:
         out_file = os.path.join(new_path, file_name)
 
         return results_, out_file
-            
-            
             
             
