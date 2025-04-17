@@ -55,12 +55,14 @@ $ python3 operator_.py --dict-input sim_search.pickle -oi "/results/experiments/
 On https://drive.google.com/drive/folders/1F6XF3p-sVwc8uyEtlDl806sODalb3rpj?usp=sharing, we are providing four models for vectorisation and must placed on results/ directory.
 
 ### Run the UI 
-<\br>
+</br>
+
 To execute the UI you must build the database server from the sqlite3 shell by typping:
 ```
 .read server/server_utils/monitorDB_create_DB.sql
 ```
-<\br>
+</br>
+
 Run the server:
 ```
 python server/main.py
