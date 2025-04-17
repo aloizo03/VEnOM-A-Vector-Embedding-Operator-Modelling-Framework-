@@ -12,7 +12,32 @@
     
     <div class="container" id="display_graph">    
       <h2>Operator Modelling Prediction Results</h2>
-      <img src="data:image/png;base64, {{ plot_url }}">
+      <br/>
+      {{desc_p|safe}}
+      <br/>
+      <table class="table" align="center" style="margin: 0px auto;">
+        <thead class="thead-dark">
+            </tr>
+                <th scope="col">RMSE</th>
+                <th scope="col">MAE</th>
+                <th scope="col">MAD</th>
+                <th scope="col">Execution Time</th>
+            </tr>
+        </thead>
+        {% for row_tuple in task_form.field_list %}
+        <div>
+            <tbody>
+                <tr>
+                </tbody>
+                    <td>{{row_tuple.rmse(class="form-control", disabled=True)}} </td>
+                    <td>{{row_tuple.mae(class="form-control", disabled=True)}}</td>
+                    <td>{{row_tuple.mad(class="form-control", disabled=True)}} </td>
+                    <td>{{row_tuple.exec_time(class="form-control", disabled=True)}} </td>
+                </tr> 
+            </tbody>
+        </div>
+        {% endfor %}
+    </table> 
     </div>
   {% endif %}
 </div>

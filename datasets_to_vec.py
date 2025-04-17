@@ -13,6 +13,7 @@ def main():
     parser.add_argument("-out", "--out-path", type=str, default="results/test",
                         help='Output path for the saving of the embeddings')
     parser.add_argument('-bz', '--batch-size', type=int, default=1, help='total batch size')
+    parser.add_argument("-g", "--graph", action="store_true")
 
     args = parser.parse_args()
 
@@ -21,9 +22,16 @@ def main():
     out_path = args.out_path
     batch_size = args.batch_size
 
+    is_graph_dataset = args.graph
+    if is_graph_dataset:
+        data_type = 2
+    else:
+        data_type = 1
+
     clustering = Vectorise(data_path=data_input_path,
                             model_path=model_path,
-                            out_path=out_path)
+                            out_path=out_path,
+                            data_type=data_type,)
 
     clustering.compute_vectors(batch_size=batch_size)
 

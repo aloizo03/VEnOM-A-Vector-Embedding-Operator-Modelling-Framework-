@@ -17,7 +17,6 @@ import os
 import time
 import pickle
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -62,9 +61,9 @@ class Vectorise:
         self.output_path = out_path
         self.device = select_device()
         if torch.cuda.device_count() > 1:
-                print("Let's use", torch.cuda.device_count(), "GPUs!")
-                # dim = 0 [30, xxx] -> [10, ...], [10, ...], [10, ...] on 3 GPUs
-                self.model = nn.DataParallel(self.model)
+            print("Let's use", torch.cuda.device_count(), "GPUs!")
+            # dim = 0 [30, xxx] -> [10, ...], [10, ...], [10, ...] on 3 GPUs
+            self.model = nn.DataParallel(self.model)
 
         logging.basicConfig(filename=os.path.join(self.output_path, 'log_file.log'), encoding='utf-8',
                             level=logging.DEBUG)
@@ -95,7 +94,7 @@ class Vectorise:
         with open(file_name, 'wb') as handle:
             pickle.dump(dict_, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-    def compute_vectors(self, batch_size, num_of_workes=8):
+    def compute_vectors(self, batch_size, num_of_workes=8, show_progress=True, ret_vec=False):
         DataBuilder = self.dataset.get_Dataloader()
         dataloader = DataLoader(DataBuilder, batch_size=batch_size, shuffle=False, num_workers=num_of_workes)
 
@@ -110,24 +109,24 @@ class Vectorise:
                     features_, dataset_idx = batch_
                     features_ = features_.to(self.device)
                     _, vectors, _ = self.model(features_)
-                    
+
                     vectors_output.append(vectors.detach().cpu().numpy())
                     vectors_dataset_idx.append(dataset_idx.numpy())
 
                     pbar.update(batch_size)
-                    if batch_idx % 10 == 0:
-                        pbar.set_description(f'Data Batch id {batch_idx}, total data vectorised {total_data}/{DataBuilder.data_len}')
+                    if batch_idx % 10 == 0 and show_progress:
+                        pbar.set_description(
+                            f'Data Batch id {batch_idx}, total data vectorised {total_data}/{DataBuilder.data_len}')
                         logger.info(str(pbar))
 
         vectors_out_np = np.concatenate(vectors_output, axis=0)
         vectors_dataset_idx_np = np.concatenate(vectors_dataset_idx, axis=0)
 
         out_vectors_dict = self.convert_vectors_to_out_list(vectors=vectors_out_np,
-                                         vectors_dataset_idx=vectors_dataset_idx_np, 
-                                         data_builder=DataBuilder)
-        
-        self.plot_vectors(vectors_out_np)
-        self.save_vectors(out_vectors_dict)
+                                                            vectors_dataset_idx=vectors_dataset_idx_np,
+                                                            data_builder=DataBuilder)
 
-
+        if not ret_vec:
+            self.plot_vectors(vectors_out_np)
+            self.save_vectors(out_vectors_dict)
 

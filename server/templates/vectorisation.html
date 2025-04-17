@@ -1,6 +1,40 @@
-<div class="button-box col-lg-12" id="vectorisation_cont1">
-    <button type="button" class="btn btn-primary" onclick="window.location.href = '/display_vecs' ; ">Display Vector Embedding Representation</button>
-  </div>
+
+    <!-- <script type = "text/javascript">
+      window.onload = function () {
+          const socket = io();  // Establish WebSocket connection
+          let socketid = undefined;
+          socket.connect("https://localhost:5000");
+          //let progressBar = document.getElementById("progressBar");
+
+          socket.on("connect", function () {
+              console.log("Socked Connected!");
+              socketid = socket.id;
+              console.log("SOCKET ID: " + socketid);
+          })
+          // socket.on("update progress", function(perecent) {
+          //     //do something with percent
+          //     console.log("Got perecent: " + perecent);
+          //     progressBar.style.width = perecent + "%";
+          // })
+
+          // let mainForm = document.getElementById("mainForm");
+          // mainForm.onsubmit = function(event) {
+          //     event.preventDefault();
+          //     fetch("/progress/" + socketid, {
+          //         method: "POST"
+          //     }).then(response => {
+          //         setTimeout(function() {
+          //             progressBar.style.width = "0%";
+          //         }, 1000);
+          //     });
+          // }
+      }
+  </script> -->
+<div class="container">
+    <div class="button-box col-lg-12" id="vectorisation_cont1">
+      <button type="button" class="btn btn-primary" onclick="window.location.href = '/display_vecs' ; ">Display Vector Embedding Representation</button>
+    </div>
+</div>
   <div class="container" id="vectorisation_cont2">
     <!-- <select class="form-select form-select-lg mb-3" aria-label=".form-select-lg example">
       <option selected>Select Dataset</option>
@@ -20,7 +54,7 @@
     <br />
     <button type="button" class="btn btn-primary">Create Vectorisation</button> -->
 
-    <form method="POST">
+    <form id="mainForm" method="POST">
       {{form.csrf_token}}
       {{form.select_dataset.label}}
       {{form.select_dataset(class="form-select form-select-lg mb-3")}}
@@ -34,6 +68,10 @@
       {{form.save_into(class="form-select form-select-lg mb-3")}}
       <br/>
       <br/>
+      <!-- <h1>Progress!</h1> -->
+      <!-- <div class="progress" style = "background-color: grey;">
+        <div class="progress-bar" id = "progressBar" role="progressbar" aria-label="Basic example" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+      </div> -->
       {{form.submit(class="btn btn-primary")}}
     </form>
 </div>

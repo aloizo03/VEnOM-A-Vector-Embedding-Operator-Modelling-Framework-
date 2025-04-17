@@ -7,7 +7,15 @@
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <!-- <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css"
+    integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous"> -->
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/3.1.0/socket.io.js" 
+     integrity="sha512-   
+  +l9L4lMTFNy3dEglQpprf7jQBhQsQ3/WvOnjaN/+/L4i0jOstgScV0q2TjfvRF4V+ZePMDuZYIQtg5T4MKr+MQ==" 
+  crossorigin="anonymous"></script> -->
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}"> <!-- Link CSS -->
+    <!-- <script src="{{ url_for('static', filename='socket.js') }}"></script>  Link JS -->
   </head>
   <body>
     <div class="container">
@@ -17,6 +25,7 @@
             <button type="button" class="btn btn-primary" id="nav_buttons" onclick="window.location.href = '/onclick_vec' ; ">Vectorisation</button>
             <button type="button" class="btn btn-primary" id="nav_buttons" onclick="window.location.href = '/sim_search' ; ">Similarity Search</button>
             <button type="button" class="btn btn-primary" id="nav_buttons" onclick="window.location.href = '/op_model' ; ">Operator Modelling</button>
+            <button type="button" class="btn btn-primary" id="nav_buttons" onclick="window.location.href = '/show_tasks' ; ">Tasks</button>
         </div>
     </div>
 
@@ -36,6 +45,10 @@
         {% include 'op_modelling.html' %}
     {%elif page_name == "operator_modelling_display"%}
         {% include 'op_modelling_display.html' %}
+    {%elif page_name == "display_tasks"%}
+        {% include 'tasks.html' %}
+    {%elif page_name == "show_datasets"%}
+        {% include 'display_datasets.html' %}
     {% else %} 
     <div class="container" id="empty_cont">
 

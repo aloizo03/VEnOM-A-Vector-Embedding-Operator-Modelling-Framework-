@@ -23,12 +23,15 @@ def main():
     out_path = args.out_path
     threshold = args.threshold
     operator_name = args.operator
+    repetitions = args.repetitions
 
-    operator_class = Create_Operator(out_path=out_path, operator_dir=input_operator_dir)
+    # operator_class = Create_Operator(out_path=out_path, operator_dir=input_operator_dir)
+    operator_class = Create_Operator(out_path=out_path, operator_dir=None)
     operator_class.create_operator(operator_name=operator_name,
                                    most_relevant_data_path=data_input_dict_path,
                                    threshold=threshold, 
-                                   repetitions=1)
+                                   repetitions=repetitions,
+                                   labels_dict=input_operator_dir)
 
 
 if __name__ == '__main__':

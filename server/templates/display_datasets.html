@@ -1,0 +1,26 @@
+<form id="mainForm" method="POST"> 
+    {{ task_form.csrf_token() }}
+    <table class="table">
+        <thead class="thead-dark">
+            </tr>
+                <th scope="col">Dataset Name</th>
+                <th scope="col">Dataset Filepath</th>
+                <th scope="col">Total Datasets</th>
+                <th scope="col">Dataset Type</th>
+            </tr>
+        </thead>
+        {% for row_tuple in task_form.field_list %}
+        <div>
+            <tbody>
+                <tr>
+                </tbody>
+                    <th scope="row">{{row_tuple.dataset_name_text(class="form-control", disabled=True)}}</th>
+                    <td>{{row_tuple.filepath_text(class="form-control", disabled=True)}} </td>
+                    <td>{{row_tuple.total_datasets_text(class="form-control", disabled=True)}}</td>
+                    <td>{{row_tuple.dataset_type_text(class="form-control", disabled=True)}} </td>
+                </tr> 
+            </tbody>
+        </div>
+        {% endfor %}
+    </table> 
+</form>

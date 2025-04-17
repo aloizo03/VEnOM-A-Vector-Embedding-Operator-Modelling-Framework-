@@ -1,13 +1,48 @@
 from flask_wtf import FlaskForm
 from flask_wtf.form import _Auto
-from wtforms import StringField, SubmitField, SelectField, RadioField
-from wtforms.validators import DataRequired
+from wtforms import StringField, SubmitField, SelectField, RadioField, FieldList, FormField, TextAreaField, DecimalField
+from wtforms.validators import DataRequired, NumberRange
+
+class DatasetsForm(FlaskForm):
+    dataset_name_text = StringField("Dataset Name")
+    filepath_text = StringField("Dataset Filepath")
+    total_datasets_text = StringField("Total Datasets")
+    dataset_type_text = StringField("Dataset Type")
+
+class updatedDatasetForm(FlaskForm):
+    title = StringField("Available Datasets")
+    field_list = FieldList(FormField(DatasetsForm), min_entries=0)
+
+class TaskForm(FlaskForm):
+    TaskId_text = StringField("Task_ID")
+    Status_text = StringField("Status")
+    Exec_Time_text = StringField("ExecutionTime")
+    Description_text = TextAreaField("Description")
+
+class updatedTaskForm(FlaskForm):
+    title = StringField("Tasks")
+    field_list = FieldList(FormField(TaskForm), min_entries=0)
+
+class Task_Op_Model_Display(FlaskForm):
+    rmse = StringField("rmse")
+    mae = StringField("mae")
+    mad = StringField("mad")
+    exec_time = StringField("exec_time")
+
+class updatedOpModelForm(FlaskForm):
+    title = StringField("Operator Modelling")
+    field_list = FieldList(FormField(Task_Op_Model_Display), min_entries=0)
+
 
 class LoadDataForm(FlaskForm):
-    Dataset_type = RadioField('Select Dataset Data Type', choices=[('1', 'Tabular Dataset'), ('2', 'Uncertaint Graph')], coerce=int)
+    Dataset_type = RadioField('Select Dataset Data Type', choices=[('1', 'Tabular Dataset'), ('2', 'Graphs ')], coerce=int)
     Dataset_DIR = StringField("Dataset Filepath", validators=[DataRequired()])
     Dataset_Name = StringField("Dataset Name", validators=[DataRequired()])
     submit = SubmitField("Submit")
+
+    def __init__(self):
+        super().__init__()
+        self.dataset_type_dict = {'1': 'Tabular Dataset', '2':  'Graphs '}
 
 
 class VectorisationForm(FlaskForm):
@@ -39,6 +74,8 @@ class SimilaritySearchForm(FlaskForm):
     sim_search_name = StringField("Name", validators=[DataRequired()], render_kw={'style': 'width: 50ch'})
     pred_data_dir_path = StringField("Prediction Datasets Directory Path", validators=[DataRequired()],  render_kw={'style': 'width: 50ch'})
     select_sim_search = RadioField('Select Similarity Search', choices=[], coerce=int)
+    select_dataset = DecimalField('λ Dataset Selection Range (0, 1)', validators=[NumberRange(min=0.1, max=1.0, message='bla')])
+    
     select_avail_vec_repr = SelectField('Select Available Vector Representation', choices=[], coerce=int)
     submit = SubmitField("Submit")
 
@@ -48,8 +85,8 @@ class SimilaritySearchForm(FlaskForm):
         self.select_avail_vec_repr.choices = [(id, avail_rep) for id, avail_rep in avail_vec_emb_reprs.items()]
 
 class OperatorModellingForm(FlaskForm):
-    sim_search_name = StringField("Name", validators=[DataRequired()])
-    sim_search_dir = StringField("Output Directory Path", validators=[DataRequired()])
+    operator_name = StringField("Name", validators=[DataRequired()])
+    operator_dir = StringField("Output Directory Path", validators=[DataRequired()])
     select_avail_oper = SelectField('Select Operator', choices=[], coerce=int)
     select_avail_vec_repr = SelectField('Select Similarity Search', choices=[], coerce=int)
 
@@ -61,7 +98,7 @@ class OperatorModellingForm(FlaskForm):
         self.select_avail_vec_repr.choices = [(id, vec) for id, vec in vectors.items()]
 
 class OperatorModellingDisplayForm(FlaskForm):
-    avail_op_models = SelectField('Select Available Vector Representation', choices=[], coerce=int)
+    avail_op_models = SelectField('Select Available Modelled Operators', choices=[], coerce=int)
     submit = SubmitField("Display")
 
     def __init__(self, avail_op_models_select=None):

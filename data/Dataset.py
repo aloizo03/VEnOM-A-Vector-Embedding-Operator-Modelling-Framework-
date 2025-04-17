@@ -1,5 +1,7 @@
+from genericpath import isfile
 import glob
 import os.path
+from re import S
 import pandas as pd
 import numpy as np
 import yaml
@@ -9,6 +11,7 @@ from sklearn.model_selection import train_test_split
 from sklearn import preprocessing
 import warnings
 from utils_.utils import check_path
+import networkx as nx
 
 warnings.filterwarnings("ignore")
 
@@ -130,7 +133,10 @@ class DataBuilder_Pipeline(data.Dataset):
                 self.data_len = len(self.datasets_data)
             else:
                 for filename in self.datasets_filename:
-                    data_ = pd.read_csv(filename)
+                    if os.path.exists(filename):
+                        data_ = pd.read_csv(filename)
+                    else:
+                        data_ = filename
                     if self.ret_all_dataset:
                         self.datasets_data.append(data_)
                     else:
@@ -144,10 +150,15 @@ class DataBuilder_Pipeline(data.Dataset):
 
             if self.create_operator:
                 # print(self.datasets_filename)
-                self.datasets_data = pd.read_csv(self.datasets_filename)
-                self.data_len = self.datasets_data.shape[0]
+                if os.path.exists(self.datasets_filename):
+                    self.datasets_data = pd.read_csv(self.datasets_filename)
+                    self.data_len = self.datasets_data.shape[0]
             else:
-                self.datasets_data.append(pd.read_csv(self.datasets_filename))
+                if os.path.exists(self.datasets_filename):
+                    self.datasets_data.append(pd.read_csv(self.datasets_filename))
+                else:
+                    self.datasets_data.append(self.datasets_filename)
+                    
                 if self.ret_table:
                     self.data_len = len(self.datasets_data)
                 else:
@@ -177,7 +188,6 @@ class DataBuilder_Pipeline(data.Dataset):
         label_np = np.asarray(labels_list)
 
         label_np = label_np.reshape(-1, 1)
-        print(label_np.shape)
         return vec_np, label_np
 
         # dataset_data = data_.dropna()
@@ -287,7 +297,6 @@ class DataBuilder_Pipeline(data.Dataset):
         labels_list = []
         idx = 0
         output_ = 11111111
-        # print(output_)
         for data_, vector_ in zip(self.datasets_data, self.vectors):
             dataset_name = self.get_dataset_name(idx=idx)
 
@@ -324,7 +333,6 @@ class DataBuilder_Pipeline(data.Dataset):
             label_np = label_np.reshape(label_np.shape[0], label_np.shape[1])
         # elif query == 'all':
         #     label_np = label_np.reshape(-1, 1, 1)
-        print(label_np.shape)
         return vec_np, label_np
 
     def get_all_dataset_data(self):
@@ -465,6 +473,75 @@ class Pipeline_Dataset:
                                     ret_class=self.ret_class,
                                     Vectors=self.vectors)
 
+class DataBuilder_Graph_Pipeline(data.Dataset):
+
+    def __init__(self, data_path, vectors, labels_dict, datasets_path_lst, return_label=False):
+        super().__init__()
+        self.data_path = data_path
+        self.vectors = vectors
+        self.labels_dicts = labels_dict
+        self.datasets_paths = datasets_path_lst
+        self.return_label = return_label
+
+        self.graph_list = []
+        self.graph_dict = {}
+        
+        for file in self.datasets_paths:
+            graph = nx.read_edgelist(file, nodetype=int)
+            node_to_int = nx.convert_node_labels_to_integers(graph)
+            self.graph_list.append(node_to_int)
+            self.graph_dict[file] = node_to_int
+
+        self.idx_to_filename = {idx: filename for idx, filename in enumerate(self.datasets_paths)}
+        self.data_len = len(self.datasets_paths)
+
+    def get_dataset_name(self, idx):
+        return self.idx_to_filename[idx]
+    
+    def get_all_data_operator_modelling(self):
+        return self.vectors
+    
+    def get_all_data(self):
+        if self.return_label:
+            labels_lst = []
+            for idx, filename in self.idx_to_filename.items():
+                labels_lst.append(self.labels_dicts[filename])
+
+            return self.graph_list, labels_lst
+        else:
+            return self.graph_list
+
+    def __len__(self):
+        return self.data_len
+
+    
+
+class graph_Pipeline_Dataset:
+    def __init__(self, data_path, Vectors=None, labels_dict=None, return_label=False):
+        self.datasets_path = data_path
+        self.vectors = Vectors
+        self.labels_dict = labels_dict
+        self.return_label=False
+
+        check_path(path=self.datasets_path)
+        if type(self.datasets_path) is list:
+            self.datasets_path_lst = [data_path]
+        elif os.path.isdir(self.datasets_path):
+            files_ = os.listdir(self.datasets_path)
+            paths_ = []
+            for file in files_:
+                filepath_ = os.path.join(self.datasets_path, file)
+                paths_.append(filepath_)
+            self.datasets_path_lst = paths_
+        elif os.path.isfile(self.datasets_path):
+            self.datasets_path_lst = [self.datasets_path]
+
+    def get_Dataloader(self):
+        return DataBuilder_Graph_Pipeline(data_path=self.datasets_path,
+                                          vectors=self.vectors,
+                                          labels_dict=self.labels_dict,
+                                          return_label=self.return_label,
+                                          datasets_path_lst=self.datasets_path_lst)
 
 class Dataset:
 
@@ -625,7 +702,6 @@ class Dataset:
                                            k_dim=self.k_dim,
                                            ret_all_dataset=self.ret_all_dataset)
         else:
-            print('in')
             dataset_path = self.datasets_dict[dataset_name]['path']
             tuples_columns = self.datasets_dict[dataset_name]['columns']
             class_columns = self.datasets_dict[dataset_name]['class']

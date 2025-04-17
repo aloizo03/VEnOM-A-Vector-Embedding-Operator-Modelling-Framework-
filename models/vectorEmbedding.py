@@ -5,9 +5,6 @@ from pathlib import Path
 from torch.xpu import device
 import torch.nn.functional as F
 
-from models.distribution.hyperspherical_uniform import HypersphericalUniform
-from models.distribution.von_mises_fisher import VonMisesFisher
-
 from models.utils import get_Transformer_Layer, get_activation_function
 import torch
 import torch.nn as nn

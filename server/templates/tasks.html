@@ -1,0 +1,26 @@
+<form id="mainForm" method="POST"> 
+    {{ task_form.csrf_token() }}
+    <table class="table">
+        <thead class="thead-dark">
+            </tr>
+                <th scope="col">Task ID</th>
+                <th scope="col">Status (Enable/Disable)</th>
+                <th scope="col">Execution Time</th>
+                <th scope="col">Description</th>
+            </tr>
+        </thead>
+        {% for row_tuple in task_form.field_list %}
+        <div>
+            <tbody>
+                <tr>
+                </tbody>
+                    <th scope="row">{{row_tuple.TaskId_text(class="form-control", disabled=True)}}</th>
+                    <td>{{row_tuple.Status_text(class="form-control", disabled=True)}} </td>
+                    <td>{{row_tuple.Exec_Time_text(class="form-control", disabled=True)}}</td>
+                    <td>{{row_tuple.Description_text(class="form-control", disabled=True)}} </td>
+                </tr> 
+            </tbody>
+        </div>
+        {% endfor %}
+    </table> 
+</form>
