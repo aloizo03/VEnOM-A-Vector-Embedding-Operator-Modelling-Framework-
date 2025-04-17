@@ -8,14 +8,15 @@ Dependencies:
 4. `karateclub=1.3.3`
 5. `networkx=2.6.3`
 6. `numpy=1.22.0 `
-7. `pytorch=2.4.0`
-8. `flask=3.1.0`
-9. `flask-wtf=1.2.2`
-10. `scikit-learn=1.6.1`
-11. `scipy=1.8.0`
-12. `sqlite=3.45.3`
-13. `statsmodels=0.13.5`
-14. `tqdm=4.67.1`
+7. `pandas=1.3.5`
+8. `pytorch=2.4.0`
+9. `flask=3.1.0`
+10. `flask-wtf=1.2.2`
+11. `scikit-learn=1.6.1`
+12. `scipy=1.8.0`
+13. `sqlite=3.45.3`
+14. `statsmodels=0.13.5`
+15. `tqdm=4.67.1`
 
 For a NumTabData2Vec model first you have to denote the dataset in "data/config.data.yaml", and the model configutation on "models/model.config.yaml"
 </br>
@@ -36,12 +37,13 @@ $ python train_graph2vec.py -i "/data/graphs_edgelist" --out "/results/graph_mod
 </br>
 When the model is trained you can use the framework:
 
-##Framework Steps
+## Framework Steps
 
 Step 1-Dataset Vectorization:
 ```
 $ python datasets_to_vec.py -ckpt "results/model_training/weights/best.pt" -i "/data/dataset/" -out "/results/experiments" -bz 8
 ```
+Adding the --graph as an argument implementing for graphs.
 
 Step 2-Similarity Search:
 </br>
@@ -49,6 +51,9 @@ On similarity search we give as an input the same model we did for the vectorisa
 ```
 $ python select_data.py -ckpt "results/model_training/weights/best.pt" -i "/data/dataset_2/dataset.csv" -out "/results/experiments" -v $VEC_DIR -s "k-means"
 ```
+Adding the --graph as an argument implementing for graphs.
+
+
 Step 3-Opeartor Modelling:
 Create labels:
 </br>
