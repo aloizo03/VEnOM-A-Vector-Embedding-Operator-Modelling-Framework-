@@ -511,4 +511,8 @@ def operator_modelling_display():
 
 
 if __name__ == "__main__":
+    if not os.path.exists(save_locally_folder):
+        os.makedirs(save_locally_folder)
+    if not os.path.exists(save_sim_search_locally):
+        os.makedirs(save_sim_search_locally)
     app.run(debug=True, host="0.0.0.0", port=5000)
