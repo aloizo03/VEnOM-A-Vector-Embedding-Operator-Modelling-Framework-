@@ -12,10 +12,10 @@ def main():
     parser.add_argument("-i", "--data-input", type=str, help="Input dataset path f.e data/path/dir")
     parser.add_argument("-out", "--out-path", type=str, default="results/test",
                         help='Output path for the saving of the embeddings')
-    parser.add_argument('-v', '--vectors', type=str, help='total batch size')
+    parser.add_argument('-v', '--vectors', type=str, help='vectors path')
     parser.add_argument('-s', '--data-selection', type=str, default='distance', help='Type of data selection (sim, distance, random)')
     parser.add_argument('-r', '--data-ratio', type=float, default=0.3, help='Percentage of who many datasets will be selectes which are relevant to data input .csv file')
-    parser.add_argument("-g", "--graph", action="store_true")
+    parser.add_argument("-g", "--graph", action="store_true", help='Set to the framework that the input dataset is a graph dataset')
 
     args = parser.parse_args()
 

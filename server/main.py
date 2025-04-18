@@ -311,6 +311,8 @@ def back_task_get_vectors(data_path, sim_search_data_name, sim_search_technique,
 
         vec_dim = controller_.get_vector_size(database_=stores_into, collection_name=data_vectors)
         model_path = get_model_path_from_size(conn=conn, vec_dim=vec_dim, data_type=data_type)
+        if 'Qdrant' == stores_into:
+            data_vectors = controller_.get_vectors_from_vectorDB(database_=stores_into, collection_name=data_vectors)
 
         sim_search_vectors = controller_.simimilarity_search_localy(data_path=data_path,
                                                                     vectors_path=data_vectors, 
@@ -319,6 +321,7 @@ def back_task_get_vectors(data_path, sim_search_data_name, sim_search_technique,
                                                                     model_path=model_path,
                                                                     out_path=save_sim_search_locally, 
                                                                     data_type=data_type)
+        
         stored_filepath = controller_.store_similarity_search_locally(out_path=save_sim_search_locally,
                                                                           name=sim_search_data_name,
                                                                           vectors_dict=sim_search_vectors)
