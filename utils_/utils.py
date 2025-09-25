@@ -18,6 +18,7 @@ from sklearn.decomposition import PCA
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 from sklearn.multioutput import MultiOutputClassifier
+import networkx as nx
 
 from sklearn.metrics import accuracy_score, mean_absolute_error, median_absolute_error, mean_absolute_percentage_error, r2_score
 from sklearn import svm
@@ -66,11 +67,53 @@ def create_ML_model(name, X, y, n_layers=200):
         operator.fit(X=X, Y=y)
     elif name.lower() == 'perceptron_regression':
         operator = neural_network.MLPRegressor(hidden_layer_sizes=n_layers)
-
         operator.fit(X=X, y=y)
     return operator
 
+def freeman_generalization(centrality_dict):
+    values = np.array(list(centrality_dict.values()))
+    max_c = np.max(values)
+    n = len(values)
+    if n <= 1:
+        return 0
+    return np.sum(max_c - values) / (n - 1)
+
+# --- Spectral Radius ---
+def spectral_radius(G):
+    A = nx.to_numpy_array(G)
+    eigenvalues = np.linalg.eigvals(A)
+    return np.max(np.abs(eigenvalues))
+
+def page_rank(G):
+    G = nx.convert_node_labels_to_integers(G)
+    max_pr =  max(nx.pagerank(G).values())
+    return max_pr
+
+def create_graph_operator(name, graph_list):
+    y = []
+    for graph in graph_list:
+        G = nx.read_edgelist(graph, nodetype=int)
+        G = nx.convert_node_labels_to_integers(G)
+        if name.lower() == 'bc':
+            y.append([freeman_generalization(nx.betweenness_centrality(G))])
+        elif name.lower() == 'ebc':
+            y.append([freeman_generalization(nx.edge_betweenness_centrality(G))])
+        elif name.lower() == 'cc':
+            y.append([freeman_generalization(nx.closeness_centrality(G))])
+        elif name.lower() == 'ec':
+            y.append([freeman_generalization(nx.eigenvector_centrality_numpy(G))])
+        elif name.lower() == 'pr':
+            try:
+                y.append([max(nx.pagerank(G).values())])
+            except Exception as err:
+                y.append([0])
+        elif name.lower() == 'sr':
+            y.append([spectral_radius(G)])
+
+    return y
+
 def create_operator(name, X, y):
+    print(name)
     if name.lower() == 'svm_sgd':
         operator = linear.SGDClassifier(max_iter=1000, tol=1e-3, loss='hinge')
     elif name.lower() == 'svm':
@@ -124,7 +167,7 @@ def fit_operator(operator, operator_name, X, y):
     return operator
 
 
-def predict_operator(operator, X, y):
+def predict_operator(operator, X, y, ret_preds=False):
     y_pred = operator.predict(X)
 
     if len(y_pred) < 2:
@@ -140,7 +183,10 @@ def predict_operator(operator, X, y):
     mad_loss = median_absolute_error(y, y_pred)
     rmse_loss = root_mean_squared_error(y, y_pred)
     MaPE_loss = mean_absolute_percentage_error(y, y_pred)
-    return acc, r_2_score, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss
+    if ret_preds:
+        return acc, r_2_score, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss, y_pred
+    else:
+        return acc, r_2_score, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss
 
 def predict_linear_regression_operator(operator, X, y, ret_preds=False):
     y_pred = operator.predict(X)
@@ -163,6 +209,19 @@ def predict_linear_regression_operator(operator, X, y, ret_preds=False):
     else:
         return r2, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss
 
+def get_metrics(y_pred, y_targets):
+    
+    nrmse_loss = RegressionMetric(y_true=y_targets, y_pred=y_pred).normalized_root_mean_square_error()
+    nrmse_loss = np.average(nrmse_loss)
+
+    r_2_score = r2_score(y_true=y_targets, y_pred=y_pred)
+    mae_loss = mean_absolute_error(y_true=y_targets, y_pred=y_pred)
+    mad_loss = median_absolute_error(y_true=y_targets, y_pred=y_pred)
+    rmse_loss = root_mean_squared_error(y_true=y_targets, y_pred=y_pred)
+    MaPE_loss = mean_absolute_percentage_error(y_true=y_targets, y_pred=y_pred)
+    
+    return r_2_score, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss
+    
 
 def predict_local_outlier(operator, X, y):
     y_pred = operator.fit_predict(X)

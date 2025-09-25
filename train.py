@@ -14,7 +14,7 @@ def main():
     parser.add_argument("-i", "--data-config", type=str, help="Input datasets path")
     parser.add_argument("-out", "--out-path", type=str, default="results/test",
                         help='the output filepath to store models and result')
-    parser.add_argument("-e", '--epochs', type=int, default=100)
+    parser.add_argument("-e", '--epochs', type=int, default=100, help='number of epochs to train')
     parser.add_argument('-lr', '--learning-rate', default=1e-2, type=float, help="The learning rate value")
 
     parser.add_argument('-lf', '--loss-function', default='loss_vae', type=str,
