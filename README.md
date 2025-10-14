@@ -81,3 +81,26 @@ Run the server:
 ```
 python server/main.py
 ```
+
+</br>
+# 📚 Citation
+
+If you use this work in your research, please cite it as follows:
+
+```bibtex
+@inproceedings{loizou2025analytics,
+  title={Analytics modelling over multiple datasets using vector embeddings},
+  author={Loizou, Andreas and Tsoumakos, Dimitrios},
+  booktitle={International Conference on Database and Expert Systems Applications},
+  pages={237--253},
+  year={2025},
+  organization={Springer}
+}
+
+@inproceedings{loizou2025venom,
+  title={VEnOM: A Vector Embedding Operator Modelling Framework},
+  author={Loizou, Andreas and Andriotis, Nikolaos and Tsoumakos, Dimitrios},
+  booktitle={Proceedings of the 19th ACM International Conference on Distributed and Event-based Systems},
+  pages={245--248},
+  year={2025}
+}
