@@ -1,10 +1,9 @@
-from data.Dataset import Pipeline_Dataset, graph_Pipeline_Dataset
-from utils_.utils import get_metrics, create_operator, create_graph_operator, predict_operator, predict_linear_regression_operator, predict_time_series_model, predict_dbscan, create_ML_model
+from data.Dataset import Pipeline_Dataset, graph_Pipeline_Dataset, Image_Pipeline_Dataset
+from utils_.utils import get_metrics, create_operator, create_graph_operator, predict_operator, predict_linear_regression_operator, predict_time_series_model, predict_dbscan, create_ML_model, normalize_label
 import pickle
 import logging
 import os
 import time
-import scipy
 import operator as op
 import csv
 import numpy as np
@@ -41,7 +40,6 @@ class Create_Operator:
         else:
             with open(outfile,'w') as csvfile:    
                 writer = csv.writer(csvfile, delimiter=',')
-                # Gives the header name row into csv
                 writer.writerow([g for g in header])  
                 writer.writerow([r for r in record]) 
         logger.info('Writing the results into a csv file')
@@ -57,7 +55,7 @@ class Create_Operator:
             pickle.dump(operator, f)
 
     
-    def create_operator(self, operator_name, most_relevant_data_path, repetitions=5, use_vectors=True, load_rel_data=True, return_res=False, labels_dict=None, is_graph=True):
+    def create_operator(self, operator_name, most_relevant_data_path, target_labels=None, repetitions=5, use_vectors=True, load_rel_data=True, return_res=False, labels_dict=None, data_type=1):
         # TODO: Add the metrics with all the labels and the predictions at the end of repetitions
         if load_rel_data:
             selected_dic = self.load_dict(path_=most_relevant_data_path)
@@ -69,7 +67,12 @@ class Create_Operator:
         }
 
         if labels_dict is not None and isinstance(labels_dict, str):
+            labels_path = labels_dict
             labels_dict = pd.read_csv(labels_dict)
+
+        if target_labels is not None and isinstance(target_labels, str):
+            target_labels_path = target_labels
+            labels_dict_target = pd.read_csv(target_labels_path)
         
         count = 0
         most_relevant_data = selected_dic['selected_dataset']
@@ -80,18 +83,28 @@ class Create_Operator:
         for j in range(repetitions):
             for dataset_name, dataset_list in most_relevant_data.items():
                 count += 1
-                dataset_predict = Pipeline_Dataset(dataset_name, norm=True, create_operator=True, ret_class=True)
-                data_builder_test = dataset_predict.get_Dataloader()
-                if is_graph:
-                    y_test = create_graph_operator(name=operator_name.lower(), graph_list=[dataset_name])
+                
+                if data_type == 2:
+                    #TODO: Make to show to give the labels of the test graph datasets
+                    # y_test = create_graph_operator(name=operator_name.lower(), graph_list=[dataset_name])
                     dataset_pred_vectors = pred_vectors[dataset_name]
                     dataset_predict = graph_Pipeline_Dataset(data_path=dataset_name,
-                                                             labels_dict=labels_dict,
+                                                             labels_dict=labels_dict_target,
                                                              Vectors=dataset_pred_vectors, 
-                                                             return_label=False)
+                                                             return_label=True)
                     data_builder_test = dataset_predict.get_Dataloader()
-                    X_test = data_builder_test.get_all_data_operator_modelling()
-                    
+                    X_test, y_test = data_builder_test.get_all_data()
+                elif data_type == 3:
+                    #TODO: Make to show to give the labels of the test image datasets
+                    dataset_pred_vectors = pred_vectors[dataset_name]
+                    dataset_predict = Image_Pipeline_Dataset(dataset_name,
+                                                             create_op=True,
+                                                             labels_dict=labels_dict_target,
+                                                             labels_dict_path=target_labels_path,
+                                                             Vectors=dataset_pred_vectors,
+                                                             return_label=True)
+                    data_builder_test = dataset_predict.get_Dataloader()
+                    X_test, y_test = data_builder_test.get_data_op_modelling(filename=dataset_name)
                 else:
                     dataset_predict = Pipeline_Dataset(dataset_name, norm=True, create_operator=True, ret_class=True)
                     data_builder_test = dataset_predict.get_Dataloader()
@@ -125,7 +138,7 @@ class Create_Operator:
                         r2, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss = predict_time_series_model(
                                 operator=self.operator, X=X_test, y=y_test, operator_name=operator_name)
                         logger.info('Use operator F')
-                        # self.save_model(filename=operator_name, operator=self.operator)
+
                         logger.info(
                                     f'Operator name: {operator_name}, for dataset {dataset_name} r2 score is: {r2}, NRMSE: {nrmse_loss}, RMSE: {rmse_loss}, MAE : {mae_loss}, MAD : {mad_loss}, MaPE : {MaPE_loss}')
                         exec_time = time.time() - start_time
@@ -186,23 +199,51 @@ class Create_Operator:
                     start_time = time.time()
 
                     if use_vectors:
-                        dataset_train = Pipeline_Dataset(dataset_filenames, norm=True, create_operator=False, ret_class=True, Vectors=dataset_vectors)
-                        data_builder_train = dataset_train.get_Dataloader()
-                        X_train, y_train = data_builder_train.get_all_dataset_data_sr(query='last', label_files=labels_dict)
-                        dataset_predict = Pipeline_Dataset(dataset_name, norm=True, create_operator=False, ret_class=True, Vectors=dataset_pred_vectors)
-                        data_builder_test = dataset_predict.get_Dataloader()
-                        if is_graph:
-                            X_test, _ = data_builder_test.get_all_dataset_data_sr(query='last', label_files=None)
+                        if data_type == 1:
+                            dataset_train = Pipeline_Dataset(dataset_filenames, norm=True, create_operator=False, ret_class=True, Vectors=dataset_vectors)
+                            data_builder_train = dataset_train.get_Dataloader()
+                            X_train, y_train = data_builder_train.get_all_dataset_data_sr(query='last', label_files=labels_dict)
+                            dataset_predict = Pipeline_Dataset(dataset_name, norm=True, create_operator=False, ret_class=True, Vectors=dataset_pred_vectors)
+                            data_builder_test = dataset_predict.get_Dataloader()
+                            X_test, y_test = data_builder_test.get_all_dataset_data_sr(query='last', label_files=None)
+                        elif data_type == 2:
+                            dataset_train = graph_Pipeline_Dataset(data_path=dataset_filenames,
+                                                             labels_dict=labels_dict,
+                                                             Vectors=dataset_vectors, 
+                                                             return_label=True)
+                            data_builder_train = dataset_train.get_Dataloader()
+                            X_train, y_train = data_builder_train.get_all_data()
+                        elif data_type == 3:
+                            dataset_pred_vectors = pred_vectors[dataset_name]
+                            dataset_train = Image_Pipeline_Dataset(dataset_filenames,
+                                                                        labels_dict=labels_dict,
+                                                                        Vectors=dataset_vectors,
+                                                                        create_op=True,
+                                                                        return_label=True)
+                            data_builder_train = dataset_train.get_Dataloader()
+                            print('Start Getting training Data')
+                            X_train, y_train = data_builder_train.get_all_data_operator_modelling(dataset_filenames)
+                            print('Finish Getting training Data')
+                            # dataset_pred_vectors = pred_vectors[dataset_name]
+                            # dataset_predict = Image_Pipeline_Dataset(dataset_name,
+                            #                                  create_op=True,
+                            #                                  labels_dict=labels_dict_target,
+                            #                                  labels_dict_path=target_labels_path,
+                            #                                  Vectors=dataset_pred_vectors,
+                            #                                  return_label=True)
+                            # data_builder_test = dataset_predict.get_Dataloader()
+                            # X_test, y_test = data_builder_test.get_data_op_modelling(filename=dataset_name)
                         else:
                             X_test, y_test = data_builder_test.get_all_dataset_data_sr(query='last', label_files=None)
                         
+                        logger.info(f'Start the creation of operator in itteration {j}')
                         operator_ = create_ML_model(X=X_train, y=y_train, name='perceptron_regression')
                     else:
                         dataset_train = Pipeline_Dataset(dataset_filenames, norm=True, create_operator=True, ret_class=True)
                         X_train, y_train = data_builder_train.get_all_dataset_data()
 
                         operator_ = create_operator(name=operator_name, X=X_train, y=y_train)
-                        
+                    
                     dataset_pred_vectors = [dataset_pred_vectors]
                     if op.contains(operator_name.lower(), 'regression'):
                         if use_vectors:
@@ -221,12 +262,6 @@ class Create_Operator:
                             self.save_csv_file(header=['Operator Name', 'Data Name', 'Acc', 'r^2', 'NRMSE', 'RMSE', 'MAE', 'MAD', 'MaPE', 'Exec time'],
                                                 record=[operator_name, dataset_name, '-', r2, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss, exec_time],
                                                 filename='results_out_new_vec.csv')
-                        # metrics_results_average['r^2'] += r2
-                        # metrics_results_average['NRMSE'] += nrmse_loss
-                        # metrics_results_average['RMSE'] += rmse_loss
-                        # metrics_results_average['MAE'] += mae_loss
-                        # metrics_results_average['MAD'] += mad_loss
-                        # metrics_results_average['MaPE'] += MaPE_loss
                         metrics_results_average['Exec time'] += exec_time
 
                     elif op.contains(operator_name.lower(), 'arima') or op.contains(operator_name.lower(), 'holt_winter'):
@@ -283,6 +318,11 @@ class Create_Operator:
                         # metrics_results_average['Acc'] += acc
                     # self.save_model(filename=operator_name, operator=operator_)
         
+        # print(pred_y)
+        # print(label_y)
+
+        label_y = [normalize_label(y) for y in label_y]
+
         pred_y = np.concatenate(pred_y, axis=0)
         label_y = np.concatenate(label_y, axis=0)
             
@@ -306,3 +346,4 @@ class Create_Operator:
             self.save_csv_file(header=['Operator Name', 'Data Name', 'Acc', 'r^2', 'NRMSE', 'RMSE', 'MAE', 'MAD', 'MaPE', 'Exec time'],
                                                 record=[operator_name, 'Average All', metrics_results_average['Acc'], '-', metrics_results_average['NRMSE'], metrics_results_average['RMSE'], metrics_results_average['MAE'], metrics_results_average['MAD'], metrics_results_average['MaPE'], metrics_results_average['r^2']],
                                                 filename='results_out_new_vec.csv')
+            print('in')

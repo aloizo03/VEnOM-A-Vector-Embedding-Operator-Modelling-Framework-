@@ -1,18 +1,18 @@
+# python select_data.py -v "vectors_f-MNIST_VDBs_100_1762274534.608018_100" -i "/opt/dlami/nvme/Results/Image_Data/f-MNIST/f-mnist_test_venom.csv" -out "/home/ubuntu/Projects/Vector Embedding/results/f-mnist/100V-VDB/sim_search" -s "vectorDB" -r 0.2 -dt "image" --vector-db -vs 100 
 
 import torch
 from models.vectorEmbedding import Num2Vec
-from data.Dataset import Pipeline_Dataset, graph_Pipeline_Dataset
+from data.Dataset import Pipeline_Dataset, graph_Pipeline_Dataset, Image_Pipeline_Dataset
 import logging
 import time
 import pickle
-import random   
 import joblib
 
 import numpy as np
 from torch.utils.data import DataLoader
-import torch.nn as nn
 
 from sklearn.decomposition import PCA
+from sklearn.random_projection import GaussianRandomProjection
 
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
@@ -23,15 +23,23 @@ import matplotlib.colors as colors
 
 from utils_.utils import calculate_cosine_similarity
 import os
+from server.server_utils.qdrant_controller import qdrant_controller
+
+from transformers import pipeline
+
 
 logger = logging.getLogger(__name__)
 
 
 class Data_selection:
 
-    def __init__(self, data_path, out_path, vectors_path, model_path, data_type):
+    def __init__(self, data_path, out_path, vectors_path, model_path, data_type, use_vector_DB, d_token=100):
         self.data_type = data_type
+        self.use_vec_db = use_vector_DB
 
+        self.qdrant_controller = None
+        if self.use_vec_db:
+            self.qdrant_controller = qdrant_controller()
         if model_path is not None:
             if self.data_type == 1:
                 ckpt = torch.load(model_path)
@@ -67,21 +75,32 @@ class Data_selection:
                                             norm=True,
                                             ret_table=table_input,
                                             k_dim=dim_k)
+                self.d_tokens = dim_k
             elif self.data_type == 2:
                 self.model = joblib.load(model_path)
-                self.model.epochs = 1
+
                 self.dataset = graph_Pipeline_Dataset(data_path=data_path,
                                          return_label=False)
+                self.d_tokens = d_token
         else:
-            self.model = None
-            self.dataset = None
+            if self.data_type == 3:
+                self.model = pipeline(task="image-feature-extraction", model_name="google/vit-base-patch16-224", pool=True, device='cuda', use_fast=True, max_new_tokens=d_token)
+                self.dataset = Image_Pipeline_Dataset(data_path=data_path, return_label=None, create_op=False)
+                self.d_tokens = d_token
+            else:
+                self.model = None
+                self.dataset = None
+                AssertionError('A model ckpt need to be provided')
         
         self.output_path = out_path
-
-        if isinstance(vectors_path, str):
-            self.vectors = self.load_dict(vectors_path)
-        elif isinstance(vectors_path, dict):
-            self.vectors = vectors_path
+        if self.use_vec_db:
+            self.qdrant_collection_name = vectors_path
+            self.vectors = self.qdrant_controller.get_vectors(collection_name=vectors_path)
+        else:
+            if isinstance(vectors_path, str):
+                self.vectors = self.load_dict(vectors_path)
+            elif isinstance(vectors_path, dict):
+                self.vectors = vectors_path
     
         logging.basicConfig(filename=os.path.join(self.output_path, 'log_file.log'),
                             encoding='utf-8',
@@ -267,8 +286,21 @@ class Data_selection:
         ax.set(xlabel=(r' $x$'), ylabel=(r'$y$'), zlabel=(r'$z$'))
         plt.savefig(os.path.join(self.output_path, 'plot_representation_2.png'), dpi=100)
 
+    def vector_DB_Search(self, collection_name, vectors, select_percent):
+        out_dict = {}
+        res_dict = {}
+        for dataset_name, vector in vectors.items():
+            sim_search_vecs = self.qdrant_controller.similarity_search_(collection_name=collection_name, vectors=vector, select_percent=select_percent)
 
-    def find_relevant_datasets(self, type_of_selection, data_ratio_selection, plot_representation=True, saved_sim_search=True, graph_dataset=False):
+            print(f'Similarity search for {dataset_name} done')
+            # sel_dataset = datasets_filenames[:top_k]
+            sel_vectors = [vec for filename_, vec in sim_search_vecs.items()]
+            sel_datasets = [filename_ for filename_, vec in sim_search_vecs.items()]
+            res_dict[dataset_name] = [sel_datasets, sel_vectors]
+        out_dict = {'selected_dataset': res_dict, 'Pred_Dataset': vectors}
+        return out_dict
+
+    def find_relevant_datasets(self, type_of_selection, data_ratio_selection, plot_representation=True, saved_sim_search=True):
 
         start_time = time.time()
         self.data_type
@@ -305,7 +337,30 @@ class Data_selection:
             vectors_out_tensors = self.model.infer(graphs=data_graphs)
             vectors_dataset_idx_tensors = np.asarray(list(DataBuilder.idx_to_filename.keys()))
 
-        # print(datasets_dict)
+            datasets_dict = self.convert_vectors_to_out_list(data_builder=DataBuilder,
+                                                            vectors=vectors_out_tensors,
+                                                            vectors_dataset_idx=vectors_dataset_idx_tensors)
+            
+            self.d_tokens = vectors_out_tensors[0].shape[0]
+            print(self.d_tokens)
+            
+        elif self.data_type == 3:
+            DataBuilder = self.dataset.get_Dataloader()
+            imgs_filepath = DataBuilder.get_all_data()
+            vectors_out_tensors = self.model(imgs_filepath)
+            vectors_dataset_idx_tensors = np.asarray(list(DataBuilder.idx_to_images.keys()))
+
+            vectors_out_np = [np.asarray(embd[0], dtype=np.float64) for embd in vectors_out_tensors]
+            vectors_out_np = np.asarray(vectors_out_np)
+            print(vectors_out_np.shape)
+            
+            projector = GaussianRandomProjection(n_components=self.d_tokens, random_state=42)
+            vectors_out_tensors = projector.fit_transform(vectors_out_np)
+
+            datasets_dict = self.convert_vectors_to_out_list(data_builder=DataBuilder,
+                                                            vectors=vectors_out_tensors,
+                                                            vectors_dataset_idx=vectors_dataset_idx_tensors)
+
         if type_of_selection.lower() == 'cosine':
             compute_data = self.compute_similarity(vect_dict=self.vectors,
                                                    vectors=datasets_dict)
@@ -329,12 +384,19 @@ class Data_selection:
             if data_ratio_selection > max_s:
                 max_s = data_ratio_selection + 0.1
             most_relevant_data = self.compute_KMeans_cluster(vect_dict=self.vectors, vectors=datasets_dict, min_s=data_ratio_selection, max_s=max_s)
-        # elif type_of_selection.lower() == 'h-clustering':
-        #     pass  
+        elif type_of_selection.lower() == 'vectordb':
+            if self.use_vec_db:
+                
+                most_relevant_data = self.vector_DB_Search(collection_name=self.qdrant_collection_name,
+                                                                               vectors=datasets_dict,
+                                                                               select_percent=data_ratio_selection)
+                # most_relevant_data = self.qdrant_controller.similarity_search_(collection_name=self.qdrant_collection_name,
+                #                                                                vectors=datasets_dict,
+                #                                                                select_percent=data_ratio_selection)
+            else:
+                raise AssertionError('You must select the --vector-DB during the input')
         else:
             raise AssertionError('Wrong type of dataset selection!!')
-
-        # log.info(f'The most relevant dataset: {most_relevant_data}')
         logger.info(f'Execution time for {type_of_selection} : {time.time() - start_time}')
         if plot_representation:
             self.plot_representation(dict_vectors=self.vectors,

@@ -81,15 +81,6 @@ class SR_Operator_Creation:
         dataset_train = Pipeline_Dataset(selected_files, norm=True, create_operator=False, ret_class=True, ret_all_dataset=True, Vectors=selected_vectors)
         data_builder_train = dataset_train.get_Dataloader()
 
-        # X_train, y_train = data_builder_train.get_all_dataset_data_sr(query='last')
-
-        # operator_ = create_ML_model(name=operator_name, X=X_train, y=y_train)
-        # exec_time = time.time() - start_time
-
-        # self.save_operator(filename=operator_name, operator=operator_)
-        # self.save_operator(filename=operator_name, operator=operators_list)
-        # datasets_ = data_builder_train.get_all_dataset_data_sr(query='all')
-
         X_train, y_train, dict_ = data_builder_train.get_all_dataset_data_sr(query='all')
 
         start_time = time.time()
@@ -97,64 +88,3 @@ class SR_Operator_Creation:
         exec_time = time.time() - start_time
         logger.info(f'Operator {operator_name} has been created exec time : {exec_time}')
         self.save_operator(filename=operator_name, operator=operator_)
-
-        # for data_dict in dict_:
-        #     X_test = data_dict['test_row']
-        #     y_test = data_dict['test_row_label']
-            
-        #     if op.contains(operator_name.lower(), 'regression'):
-        #         r2, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss = predict_linear_regression_operator(
-        #                 operator=operator_, X=X_test, y=y_test)
-        #         logger.info(f'Execution time : {exec_time}')
-        #         self.save_csv_file(header=['Operator Name', 'Acc', 'r^2', 'NRMSE', 'RMSE', 'MAE', 'MAD', 'MaPE', 'Exec time'],
-        #                                 record=[operator_name, '-', r2, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss, exec_time],
-        #                                 filename='results_out.csv')
-        #     elif op.contains(operator_name.lower(), 'arima') or op.contains(operator_name.lower(), 'holt_winter'):
-        #         r2, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss = predict_time_series_model(operator=operator_, 
-        #                                                                                              X=X_test, 
-        #                                                                                              y=y_test, 
-        #                                                                                              operator_name=operator_name)
-        #         logger.info(f'Execution time : {exec_time}')
-        #         self.save_csv_file(header=['Operator Name', 'Acc', 'r^2', 'NRMSE', 'RMSE', 'MAE', 'MAD', 'MaPE', 'Exec time'],
-        #                                 record=[operator_name, '-', r2, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss, exec_time],
-        #                                 filename='results_out.csv')
-        #     elif op.contains(operator_name.lower(), 'dbscan'):
-        #         acc, r2, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss = predict_dbscan(
-        #                 operator=operator_, X=X_test, y=y_test)
-        #         logger.info(f'Execution time : {exec_time}')
-        #         self.save_csv_file(header=['Operator Name', 'Acc', 'r^2', 'NRMSE', 'RMSE', 'MAE', 'MAD', 'MaPE', 'Exec time'],
-        #                                 record=[operator_name, acc, '-', nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss, exec_time],
-        #                                 filename='results_out.csv')
-        #     else:
-        #         acc, r2, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss = predict_operator(operator=operator_,
-        #                                                                                             X=X_test, y=y_test)
-        #         logger.info(f'Execution time : {exec_time}')
-        #         self.save_csv_file(header=['Operator Name', 'Acc', 'r^2', 'NRMSE', 'RMSE', 'MAE', 'MAD', 'MaPE', 'Exec time'],
-        #                                 record=[operator_name, acc, '-', nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss, exec_time],
-        #                                 filename='results_out.csv')
-        # self.save_operator(filename=operator_name, operator=operator_)
-        # self.save_operator(filename=operator_name, operator=operators_list)
-        # data_builder_train = dataset_train.get_Dataloader()
-        # X_train, y_train = data_builder_train.get_all_dataset_data()
-        # if split_data:
-        #     X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, test_size=0.2, random_state=42)
-        # start_time = time.time()
-        # operator_ = create_operator(name=operator_name,
-        #                             X=X_train,
-        #                             y=y_train)
-
-        # logger.info(f"Operator {operator_name} have been created, time executed {time.time() - start_time}sec")
-
-        # if split_data:
-        #     if op.contains(operator_name.lower(), 'regression'):
-        #         r2, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss = predict_linear_regression_operator(
-        #             operator=operator_, X=X_test, y=y_test)
-        #         acc=None
-        #     else:
-        #         acc, r2, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss = predict_operator(operator=operator_,
-        #                                                                                          X=X_test, y=y_test)
-
-        #     logger.info(f"Operator {operator_name} testing performance: accuracy is: {acc}, r^2: {r2}, NRMSE: {nrmse_loss}, RMSE: {rmse_loss}, MAE : {mae_loss}, MAD : {mad_loss}, MaPE : {MaPE_loss}")
-
-        # self.save_operator(filename=operator_name, operator=operator_)
-        # logger.info('Operator has been saved')

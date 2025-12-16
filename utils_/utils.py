@@ -3,7 +3,6 @@ import torch.nn as nn
 import os
 from scipy import spatial
 import numpy as np
-import matplotlib.pyplot as plt
 
 from permetrics.regression import RegressionMetric
 
@@ -17,12 +16,23 @@ from sklearn.neighbors import LocalOutlierFactor
 from sklearn.decomposition import PCA
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.multioutput import MultiOutputClassifier
 import networkx as nx
+from sklearn.model_selection import GridSearchCV
 
 from sklearn.metrics import accuracy_score, mean_absolute_error, median_absolute_error, mean_absolute_percentage_error, r2_score
 from sklearn import svm
 import scipy
+
+from server.server_utils.qdrant_controller import qdrant_controller
+
+def get_file_modified_time(file):
+    return os.stat(file).st_ctime
+
+def get_vec_DB_collections():
+    controler = qdrant_controller()
+    return controler.get_all_colections()
 
 def calculate_accuracy(predictions, gt_labels):
     """
@@ -66,12 +76,16 @@ def create_ML_model(name, X, y, n_layers=200):
         operator = MultiOutputClassifier(linear.SGDClassifier(max_iter=1000, tol=1e-3, loss='perceptron'))
         operator.fit(X=X, Y=y)
     elif name.lower() == 'perceptron_regression':
-        operator = neural_network.MLPRegressor(hidden_layer_sizes=n_layers)
+        operator = neural_network.MLPRegressor(hidden_layer_sizes=n_layers, max_iter=1000, early_stopping=True)
         operator.fit(X=X, y=y)
     return operator
 
 def freeman_generalization(centrality_dict):
     values = np.array(list(centrality_dict.values()))
+    
+    if values.size == 0:
+        return 0.0
+    
     max_c = np.max(values)
     n = len(values)
     if n <= 1:
@@ -89,27 +103,85 @@ def page_rank(G):
     max_pr =  max(nx.pagerank(G).values())
     return max_pr
 
+def img_svm(x_train,y_train, X_test, sgd=False):
+    # Defining the parameters grid for GridSearchCV
+    param_grid={'C':[0.1,1,10,100],
+                'gamma':[0.0001,0.001,0.1,1],
+                'kernel':['rbf','poly']}
+
+    # Creating a support vector classifier
+    svc=svm.SVC(probability=True, decision_function_shape='ovo')
+
+    # Creating a model using GridSearchCV with the parameters grid
+    model=GridSearchCV(svc,param_grid)
+
+    model.fit(x_train,y_train)
+
+    return model, model.predict(X_test)
+
+def create_image_operator(name, X, y, X_test):
+    y_ret = []
+    if name.lower() == 'img_svm' or name.lower() == 'image_svm':
+        pass
+    
 def create_graph_operator(name, graph_list):
     y = []
+
     for graph in graph_list:
+        # Load graph
         G = nx.read_edgelist(graph, nodetype=int)
+
+        # Skip empty graph safely
+        if G.number_of_nodes() == 0:
+            y.append([0.0])
+            continue
+
+        # Normalize labels
         G = nx.convert_node_labels_to_integers(G)
+
+        # Betweenness centrality
         if name.lower() == 'bc':
-            y.append([freeman_generalization(nx.betweenness_centrality(G))])
-        elif name.lower() == 'ebc':
-            y.append([freeman_generalization(nx.edge_betweenness_centrality(G))])
-        elif name.lower() == 'cc':
-            y.append([freeman_generalization(nx.closeness_centrality(G))])
-        elif name.lower() == 'ec':
-            y.append([freeman_generalization(nx.eigenvector_centrality_numpy(G))])
-        elif name.lower() == 'pr':
+            c = nx.betweenness_centrality(G)
+            y.append([freeman_generalization(c)])
+            continue
+
+        # Edge betweenness
+        if name.lower() == 'ebc':
+            c = nx.edge_betweenness_centrality(G)
+            y.append([freeman_generalization(c)])
+            continue
+
+        # Closeness
+        if name.lower() == 'cc':
+            c = nx.closeness_centrality(G)
+            y.append([freeman_generalization(c)])
+            continue
+
+        # Eigenvector centrality (needs special handling)
+        if name.lower() == 'ec':
+            try:
+                c = nx.eigenvector_centrality_numpy(G)
+                y.append([freeman_generalization(c)])
+            except Exception:
+                # Graph is disconnected or empty → return safe value
+                y.append([0.0])
+            continue
+
+        # PageRank
+        if name.lower() == 'pr':
             try:
                 y.append([max(nx.pagerank(G).values())])
-            except Exception as err:
-                y.append([0])
-        elif name.lower() == 'sr':
-            y.append([spectral_radius(G)])
+            except Exception:
+                y.append([0.0])
+            continue
 
+        # Spectral radius
+        if name.lower() == 'sr':
+            try:
+                y.append([spectral_radius(G)])
+            except Exception:
+                y.append([0.0])
+            continue
     return y
 
 def create_operator(name, X, y):
@@ -119,7 +191,7 @@ def create_operator(name, X, y):
     elif name.lower() == 'svm':
         operator = svm.SVC()
     elif name.lower() == 'svm_mcc':
-        operator = svm.SVC(decision_function_shape='ovo')
+        operator = svm.SVC(decision_function_shape='ovo', max_iter=1000, tol=1e-3)
     elif name.lower() == 'logistic_regression_sgd':
         operator = linear.SGDClassifier(max_iter=1000, tol=1e-3, loss='log_loss')
     elif name.lower() == 'logistic_regression':
@@ -138,8 +210,8 @@ def create_operator(name, X, y):
         operator = DBSCAN(eps=0.5, min_samples=5)  
     elif name.lower() == 'local_outlier_factor':
         operator = LocalOutlierFactor(n_neighbors=2)
-    elif name.lower() == 'eigenvalue':
-        operator = None
+    elif name.lower() == 'knn':
+        operator = KNeighborsClassifier(n_neighbors=3)
     elif name.lower() == 'arima':
         operator = ARIMA(y, order=(1,1,0))
         operator = operator.fit()
@@ -187,9 +259,15 @@ def predict_operator(operator, X, y, ret_preds=False):
         return acc, r_2_score, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss, y_pred
     else:
         return acc, r_2_score, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss
-
+    
 def predict_linear_regression_operator(operator, X, y, ret_preds=False):
+    
+    if not isinstance(y, (list, np.ndarray)):
+        y = np.array([y])
+        y[np.isnan(y)] = 0
+
     y_pred = operator.predict(X)
+
     
     if len(y_pred) < 2:
         y_pred = np.reshape(y_pred,(-1,y_pred.shape[0]))
@@ -260,7 +338,7 @@ def predict_time_series_model(operator, X, y, operator_name, ret_preds=False):
 
 def predict_dbscan(operator, X, y):
     y_pred = operator.fit_predict(X=X)
-
+    
     if len(y_pred) < 2:
         y_pred = np.reshape(y_pred,(-1,y_pred.shape[0]))
         nrmse_loss = 1
@@ -290,13 +368,11 @@ def compute_eig_value(X, y=None):
     if standardized_data.ndim == 1:
         standardized_data = standardized_data.reshape(-1, 1)
 
-    # Step 3: Compute the covariance matrix
     cov_matrix = np.cov(standardized_data, rowvar=False)
 
     if cov_matrix.ndim == 1:
         cov_matrix = cov_matrix.reshape(1, -1)
 
-    # Step 4: Compute eigenvalues and eigenvectors
     if cov_matrix.ndim == 0:
         eigenvalues = 0
         eigenvectors = 0
@@ -324,3 +400,84 @@ def compute_sum(X):
 
 def compute_avg(X):
     return np.average(X)
+
+import os
+
+def safe_join(base, rel):
+    base_parts = os.path.normpath(base).split(os.sep)
+    rel_parts = os.path.normpath(rel).lstrip(os.sep).split(os.sep)
+
+    # Avoid duplication if last folder in base == first folder in rel
+    if base_parts and rel_parts and base_parts[-1] == rel_parts[0]:
+        rel_parts = rel_parts[1:]
+
+    return os.path.join(base, *rel_parts)
+
+
+
+def update_img_fullpath(df, filepath):
+    head_path = os.path.dirname(filepath)
+    head_path_abs = os.path.abspath(head_path)
+
+    # Determine which column to use
+    col = "file_path" if "file_path" in df.columns else "filename"
+
+    for index, row in df.iterrows():
+        original = str(row[col]).strip()
+
+        # Normalize existing string
+        normalized = os.path.normpath(original)
+
+        # Absolute paths for reliable comparison
+        normalized_abs = os.path.abspath(normalized)
+
+        # Case 1: Already inside head_path → keep it as-is
+        if normalized_abs.startswith(head_path_abs):
+            df.at[index, col] = normalized_abs
+            continue
+
+        # Case 2: Filename already contains the dataset folder "f-MNIST"
+        # Avoid:
+
+        #   head_path / "f-MNIST/img1.png" → duplicate!
+        last_folder = os.path.basename(head_path_abs)
+
+        parts = normalized.split(os.sep)
+        if parts[0] == last_folder:
+            # Remove duplicate dataset folder
+            normalized = os.path.join(*parts[1:])
+
+        # Now safely join
+        full_path = os.path.normpath(os.path.join(head_path_abs, normalized))
+
+        df.at[index, col] = full_path
+
+    return df
+
+import numpy as np
+
+def normalize_label(y):
+    """
+    Normalize label into a 1-D numpy array.
+    Handles scalars, lists, nested lists of size N.
+    """
+    arr = np.array(y)
+
+    # Case 0: scalar → [scalar]
+    if arr.ndim == 0:
+        return arr.reshape(1)
+
+    # Case 1: shape (N, 1) → (N,)
+    if arr.ndim == 2 and arr.shape[1] == 1:
+        return arr.reshape(-1)
+
+    # Case 2: already 1D → (N,)
+    if arr.ndim == 1:
+        return arr
+
+    # Case 3: shape (1, N) → (N,)
+    if arr.ndim == 2 and arr.shape[0] == 1:
+        return arr.flatten()
+
+    # Unexpected shape (rare)
+    return arr.flatten()

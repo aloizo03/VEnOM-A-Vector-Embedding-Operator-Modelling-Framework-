@@ -16,7 +16,7 @@ def split_sub_tables(df, chunk_size):
     return df_chunks
 
 
-def collator_fn(data):
+def collator_fn(data, data_cat):
     # TODO: Make to stack data with different dimensional inputs
     max_dim_rows = np.max([d.shape[0] for d in data])
     max_dim_col = np.max([d.shape[1] for d in data])
@@ -30,7 +30,9 @@ def collator_fn(data):
         reshape_data.append(tensor_)
 
     stack_data = torch.stack(reshape_data, dim=0)
-    return stack_data
+    df = data_cat[:].values
+    
+    return stack_data, df
 
 
 def transformation_binary(tuples):

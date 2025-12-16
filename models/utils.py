@@ -27,7 +27,7 @@ class Model_Config:
         self.ret_all_dataset = model_config_file['read_all_dataset']
         self.table_input = model_config_file['table_train']
         self.dim_k = model_config_file['dim_k']
-
+        self.text_tokenizer = model_config_file['text_tokenizer']
 
 def load_model_config(config_path):
     if not os.path.exists(config_path):

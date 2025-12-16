@@ -1,11 +1,20 @@
 import numpy as np
 import pandas as pd
 
-from data.Dataset import Pipeline_Dataset
+from data.Dataset import Pipeline_Dataset, graph_Pipeline_Dataset, Image_Pipeline_Dataset
+import logging
+import time
+import pickle
+import joblib
 from utils_.utils import create_operator, create_ML_model, predict_dbscan, predict_operator, predict_linear_regression_operator, fit_operator, predict_time_series_model, compute_rank, compute_sum, compute_avg, compute_eig_value
 from torch.utils.data import DataLoader
 from models.torch_utils import select_device
 import csv
+from utils_.utils import calculate_cosine_similarity
+import os
+from server.server_utils.qdrant_controller import qdrant_controller
+
+from transformers import pipeline
 
 from models.vectorEmbedding import Num2Vec
 import torch
@@ -19,57 +28,76 @@ import operator as op
 logger = logging.getLogger(__name__)
 
 class Train_Operator:
-    def __init__(self, vec_input_path, pred_path, out_path, sr, model_path):
+    def __init__(self, vec_input_path, pred_path, out_path, sr, model_path, data_type, use_vector_DB):
         
         self.device = select_device()
-        ckpt = torch.load(model_path)
-
-        model_info = ckpt['model_info']
-        input_dim = model_info['d_numerical']
-        d_out = model_info['d_out']
-        d_tokens = model_info['d_token']
-        num_layers = model_info['num_layers']
-        head_num = model_info['head_num']
-        attention_dropout = model_info['att_dropout']
-        ffn_dropout = model_info['ffn_dropout']
-        ffn_dim = model_info['ffn_dim']
-        activation = model_info['activation']
-        dim_k = model_info['dim_k']
-        table_input = model_info['ret_table']
-
-        self.model = Num2Vec(d_numerical=input_dim,
-                             d_out=d_out,  # create a 3d representation
-                             n_layers=num_layers,
-                             d_token=d_tokens,
-                             head_num=head_num,
-                             attention_dropout=attention_dropout,
-                             ffn_dropout=ffn_dropout,
-                             ffn_dim=ffn_dim,
-                             activation=activation,
-                             train=False,
-                             input_table=table_input,
-                             d_k=dim_k)
-
-        self.model.load_state_dict(ckpt['model_state_dict'])
-        
-        self.vec_input_path = vec_input_path
+        self.data_type = data_type
+        self.use_vector_DB = use_vector_DB
         self.pred_path = pred_path
-        self.dataset = Pipeline_Dataset(data_path=self.pred_path,
-                                        norm=True,
-                                        ret_table=table_input,
-                                        k_dim=dim_k)
+        if self.data_type == 1:
+            ckpt = torch.load(model_path)
+
+            model_info = ckpt['model_info']
+            input_dim = model_info['d_numerical']
+            d_out = model_info['d_out']
+            d_tokens = model_info['d_token']
+            num_layers = model_info['num_layers']
+            head_num = model_info['head_num']
+            attention_dropout = model_info['att_dropout']
+            ffn_dropout = model_info['ffn_dropout']
+            ffn_dim = model_info['ffn_dim']
+            activation = model_info['activation']
+            dim_k = model_info['dim_k']
+            table_input = model_info['ret_table']
+
+            self.model = Num2Vec(d_numerical=input_dim,
+                                d_out=d_out,  # create a 3d representation
+                                n_layers=num_layers,
+                                d_token=d_tokens,
+                                head_num=head_num,
+                                attention_dropout=attention_dropout,
+                                ffn_dropout=ffn_dropout,
+                                ffn_dim=ffn_dim,
+                                activation=activation,
+                                train=False,
+                                input_table=table_input,
+                                d_k=dim_k)
+
+            self.model.load_state_dict(ckpt['model_state_dict'])
+            
+            
+           
+            self.dataset = Pipeline_Dataset(data_path=self.pred_path,
+                                            norm=True,
+                                            ret_table=table_input,
+                                            k_dim=dim_k)
+        elif self.data_type == 2:
+            self.model = joblib.load(model_path)
+
+            self.dataset = graph_Pipeline_Dataset(data_path=self.pred_path, return_label=False)
+        elif self.data_type == 3:
+            self.model = pipeline(task="image-feature-extraction", model_name="google/vit-base-patch16-224", pool=True, device='cuda', use_fast=True, max_new_tokens=d_token)
+            # self.dataset = Image_Pipeline_Dataset(data_path=self.pred_path, return_label=None, create_op=False)
+        else:
+            self.model = None
+            self.dataset = None
+            AssertionError('A model ckpt need to be provided')
         self.out_path = out_path
-
+        self.vec_input_path = vec_input_path
         self.sr = sr
-
+        if use_vector_DB:
+            self.qdrant_controller = qdrant_controller()
         self.vectors = self.read_vectors()
         logging.basicConfig(filename=os.path.join(self.out_path, 'log_file.log'), encoding='utf-8',
                             level=logging.DEBUG)
         logger.setLevel(logging.INFO)
 
     def read_vectors(self):
-        with open(self.vec_input_path, 'rb') as handle:
-            b = pickle.load(handle)
+        if self.use_vector_DB:
+            b = self.qdrant_controller.get_vectors(collection_name=self.vec_input_path)
+        else:
+            with open(self.vec_input_path, 'rb') as handle:
+                b = pickle.load(handle)
         return b
 
     def select_datasets_uniform(self):
@@ -84,25 +112,33 @@ class Train_Operator:
         return random_choice_datasets, selected_vectors
     
     def create_vectors_(self):
-        DataBuilder = self.dataset.get_Dataloader()
-        dataloader = DataLoader(DataBuilder, batch_size=1, shuffle=False)
+        if self.data_type == 1:
+            DataBuilder = self.dataset.get_Dataloader()
+            dataloader = DataLoader(DataBuilder, batch_size=1, shuffle=False)
 
-        vectors_output = []
-        vectors_dataset_idx = []
+            vectors_output = []
+            vectors_dataset_idx = []
 
-        with torch.no_grad():
-            for batch_idx, batch_ in enumerate(dataloader):
-                features_, dataset_idx = batch_
-                features_ = features_.to(self.device)
-                _, vectors, _ = self.model(features_)
-                    
-                vectors_output.append(vectors.detach().cpu().numpy())
-                vectors_dataset_idx.append(dataset_idx.numpy())
+            with torch.no_grad():
+                for batch_idx, batch_ in enumerate(dataloader):
+                    features_, dataset_idx = batch_
+                    features_ = features_.to(self.device)
+                    _, vectors, _ = self.model(features_)
+                        
+                    vectors_output.append(vectors.detach().cpu().numpy())
+                    vectors_dataset_idx.append(dataset_idx.numpy())
 
-        vectors_out_np = np.concatenate(vectors_output, axis=0)
-        vectors_dataset_idx_np = np.concatenate(vectors_dataset_idx, axis=0)
-        
-        self.dataset =  Pipeline_Dataset(self.pred_path, norm=True, create_operator=False, ret_class=True, ret_all_dataset=True, Vectors=vectors_out_np)
+            vectors_out_np = np.concatenate(vectors_output, axis=0)
+            vectors_dataset_idx_np = np.concatenate(vectors_dataset_idx, axis=0)
+            
+            self.dataset =  Pipeline_Dataset(self.pred_path, norm=True, create_operator=False, ret_class=True, ret_all_dataset=True, Vectors=vectors_out_np)
+        elif self.data_type == 2:
+            DataBuilder = self.dataset.get_Dataloader()
+            data_graphs = DataBuilder.get_all_data()
+            vectors_out_np = self.model.infer(graphs=data_graphs)
+            vectors_dataset_idx_np = np.asarray(list(DataBuilder.idx_to_filename.keys()))
+        elif self.data_type == 3:
+            pass
 
         return vectors_out_np, vectors_dataset_idx_np
     
@@ -126,24 +162,51 @@ class Train_Operator:
                 writer.writerow([r for r in record]) 
         logger.info('Writing the results into a csv file')
 
-    def train_operator(self, ML_model_name, query, op_name, scores_file=None, repititions=1):
+    def train_operator(self, ML_model_name, query, op_name, scores_file=None, score_target_file=None, repititions=2):
         logger.info(f'Experiments for operator {op_name}')
         start_time = time.time()
         pred_vectors, pred_dataset_idx = self.create_vectors_()
         
         selected_datasets, selected_vectors = self.select_datasets_uniform()
 
-        dataset_train = Pipeline_Dataset(selected_datasets, norm=True, create_operator=False, ret_class=True, ret_all_dataset=True, Vectors=selected_vectors)
+        if self.data_type == 1:
+            dataset_train = Pipeline_Dataset(selected_datasets, norm=True, create_operator=False, ret_class=True, ret_all_dataset=True, Vectors=selected_vectors)
+        elif self.data_type == 2:
+            score_file_df = self.read_scores(scores_file)
+            dataset_train = graph_Pipeline_Dataset(data_path=selected_datasets, return_label=True, labels_dict=score_file_df, Vectors=selected_vectors)
+        elif self.data_type == 3:
+            score_file_df = self.read_scores(scores_file)
+            dataset_train = Image_Pipeline_Dataset(data_path=selected_datasets, return_label=True, create_op=True, labels_dict_path=score_target_file, labels_dict=score_file_df, Vectors=selected_vectors)
 
         if scores_file is not None:
             score_file_df = self.read_scores(scores_file)
         else:
             score_file_df = None
 
-        data_builder_train = dataset_train.get_Dataloader()
-        X_train, y_train = data_builder_train.get_all_dataset_data_sr(query=query, label_files=score_file_df)
-        data_test = self.dataset.get_Dataloader()
-        X_test, y_test = data_test.get_all_dataset_data_sr(query=query, label_files=None)
+        if self.data_type == 1:
+            data_builder_train = dataset_train.get_Dataloader()
+            X_train, y_train = data_builder_train.get_all_dataset_data_sr(query=query, label_files=score_file_df)
+            data_test = self.dataset.get_Dataloader()
+            X_test, y_test = data_test.get_all_dataset_data_sr(query=query, label_files=None)
+        elif self.data_type == 2:
+            data_builder_train = dataset_train.get_Dataloader()
+            X_train, y_train = data_builder_train.get_all_data()
+            score_target_file_df = self.read_scores(score_target_file)
+            self.dataset = graph_Pipeline_Dataset(data_path=self.pred_path, return_label=True, labels_dict=score_target_file_df, Vectors=self.vectors)
+            data_test = self.dataset.get_Dataloader()
+            X_test, y_test = data_test.get_all_data()
+        elif self.data_type == 3:
+            data_builder_train = dataset_train.get_Dataloader()
+            X_train, y_train = data_builder_train.get_all_data()
+            score_target_file_df = self.read_scores(score_target_file)
+            self.dataset = Image_Pipeline_Dataset(data_path=self.pred_path, 
+                                                  create_op=True,
+                                                  labels_dict=score_target_file_df,
+                                                  labels_dict_path=score_target_file,
+                                                  Vectors=self.vectors,
+                                                  return_label=True)
+            data_test = self.dataset.get_Dataloader()
+            X_test, y_test = data_test.get_all_data()
 
         if score_file_df is not None:
                 if op_name.lower() == 'rank' or op_name.lower() == 'sum' or op_name.lower() == 'avg' or op_name.lower() == 'eig':
@@ -207,6 +270,6 @@ class Train_Operator:
         
         self.save_csv_file(header=['Operator Name', 'Data Name', 'Acc', 'r^2', 'NRMSE', 'RMSE', 'MAE', 'MAD', 'MaPE', 'Exec time'],
                                             record=[op_name, f'Average All with Query: {query}', metrics_results_average['Acc'], '-', metrics_results_average['NRMSE'], metrics_results_average['RMSE'], metrics_results_average['MAE'], metrics_results_average['MAD'], metrics_results_average['MaPE'], metrics_results_average['r^2']],
-                                            filename='results_out.csv')
+                                            filename='results_out_sr.csv')
 
 
