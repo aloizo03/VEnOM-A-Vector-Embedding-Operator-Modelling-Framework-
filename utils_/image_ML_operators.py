@@ -58,10 +58,10 @@ class ImgDataset(torch.utils.data.Dataset):
 
 
 class CNN(nn.Module):
-    def __init__(self):
+    def __init__(self, input_dim = (1, 32, 3), NUM_Class=10):
         super().__init__()
         self.features = nn.Sequential(
-            nn.Conv2d(1, 32, 3, padding=1), nn.ReLU(),
+            nn.Conv2d(input_dim, padding=1), nn.ReLU(),
             nn.MaxPool2d(2),
             nn.Conv2d(32, 64, 3, padding=1), nn.ReLU(),
             nn.MaxPool2d(2)
@@ -69,7 +69,7 @@ class CNN(nn.Module):
         self.classifier = nn.Sequential(
             nn.Flatten(),
             nn.Linear(64 * 7 * 7, 128), nn.ReLU(),
-            nn.Linear(128, 10)
+            nn.Linear(128, NUM_Class)
         )
 
     def forward(self, x):

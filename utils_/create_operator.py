@@ -11,11 +11,14 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+CURRENT_MACHINE_ROOT = '/various/aloizou/Results/Results/'
 
 class Create_Operator:
 
-    def __init__(self, out_path, operator_dir):
+    def __init__(self, out_path, operator_dir, out_file):
         self.out_path = out_path
+
+        self.out_file = out_file
 
         self.operator_dir = operator_dir
 
@@ -55,8 +58,31 @@ class Create_Operator:
             pickle.dump(operator, f)
 
     
+    def make_path_agnostic(self, old_path, new_base_dir, anchor_folder="Data/"):
+        
+        if not isinstance(old_path, str):
+            return old_path
+
+        if anchor_folder in old_path:
+            
+            relative_path = old_path.split(anchor_folder)[-1]
+            
+            
+            new_path = os.path.join(new_base_dir, anchor_folder, relative_path)
+            
+            return os.path.normpath(new_path)
+        
+        # If the anchor isn't found, return the original or handle the error
+        return old_path
+
     def create_operator(self, operator_name, most_relevant_data_path, target_labels=None, repetitions=5, use_vectors=True, load_rel_data=True, return_res=False, labels_dict=None, data_type=1):
-        # TODO: Add the metrics with all the labels and the predictions at the end of repetitions
+        if data_type == 2:
+            anchor_path = 'Data/'
+        elif data_type == 1:
+            anchor_path = 'data/'
+        elif data_type == 3:
+            anchor_path = 'Image_Data/'
+
         if load_rel_data:
             selected_dic = self.load_dict(path_=most_relevant_data_path)
         else:
@@ -67,12 +93,32 @@ class Create_Operator:
         }
 
         if labels_dict is not None and isinstance(labels_dict, str):
-            labels_path = labels_dict
             labels_dict = pd.read_csv(labels_dict)
+            if 'Dataset Name' in labels_dict.columns:
+                col_name = 'Dataset Name'
+            elif 'file_path' in labels_dict.columns:
+                col_name = 'file_path'
+            else:
+                raise KeyError("Neither 'Dataset Name' nor 'filepath' found in the labels CSV.")
+
+            labels_dict[col_name] = labels_dict[col_name].apply(
+                lambda path: self.make_path_agnostic(path, CURRENT_MACHINE_ROOT, anchor_folder=anchor_path)
+            )
 
         if target_labels is not None and isinstance(target_labels, str):
+            labels_dict_target = pd.read_csv(target_labels)
             target_labels_path = target_labels
-            labels_dict_target = pd.read_csv(target_labels_path)
+
+            if 'Dataset Name' in labels_dict_target.columns:
+                col_name_target = 'Dataset Name'
+            elif 'file_path' in labels_dict_target.columns:
+                col_name_target = 'file_path'
+            else:
+                raise KeyError("Neither 'Dataset Name' nor 'file_path' found in the target labels CSV.")
+
+            labels_dict_target[col_name_target] = labels_dict_target[col_name_target].apply(
+                lambda path: self.make_path_agnostic(path, CURRENT_MACHINE_ROOT, anchor_folder=anchor_path)
+            )
         
         count = 0
         most_relevant_data = selected_dic['selected_dataset']
@@ -125,7 +171,7 @@ class Create_Operator:
                         if not return_res:
                             self.save_csv_file(header=['Operator Name', 'Data Name', 'Acc', 'r^2', 'NRMSE', 'RMSE', 'MAE', 'MAD', 'MaPE', 'Exec time'],
                                                 record=[operator_name, dataset_name, '-', r2, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss, exec_time],
-                                                filename='results_out.csv')
+                                                filename=self.out_file)
                         metrics_results_average['r^2'] += r2
                         metrics_results_average['NRMSE'] += nrmse_loss
                         metrics_results_average['RMSE'] += rmse_loss
@@ -147,7 +193,7 @@ class Create_Operator:
                         if not return_res:
                             self.save_csv_file(header=['Operator Name', 'Data Name', 'Acc', 'r^2', 'NRMSE', 'RMSE', 'MAE', 'MAD', 'MaPE', 'Exec time'],
                                                 record=[operator_name, dataset_name, '-', r2, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss, exec_time],
-                                                filename='results_out.csv')
+                                                filename=self.out_file)
                         metrics_results_average['r^2'] += r2
                         metrics_results_average['NRMSE'] += nrmse_loss
                         metrics_results_average['RMSE'] += rmse_loss
@@ -163,7 +209,7 @@ class Create_Operator:
                         if not return_res:
                             self.save_csv_file(header=['Operator Name', 'Acc', 'r^2', 'NRMSE', 'RMSE', 'MAE', 'MAD', 'MaPE', 'Exec time'],
                                             record=[operator_name, acc, '-', nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss, exec_time],
-                                            filename='results_out.csv')
+                                            filename=self.out_file)
                         metrics_results_average['r^2'] += r2
                         metrics_results_average['NRMSE'] += nrmse_loss
                         metrics_results_average['RMSE'] += rmse_loss
@@ -181,7 +227,7 @@ class Create_Operator:
                         if not return_res:
                             self.save_csv_file(header=['Operator Name', 'Data Name', 'Acc', 'r^2', 'NRMSE', 'RMSE', 'MAE', 'MAD', 'MaPE', 'Exec time'],
                                                 record=[operator_name, dataset_name, acc, '-', nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss, exec_time],
-                                                filename='results_out.csv')
+                                                filename=self.out_file)
                         metrics_results_average['r^2'] += r2
                         metrics_results_average['NRMSE'] += nrmse_loss
                         metrics_results_average['RMSE'] += rmse_loss
@@ -221,9 +267,7 @@ class Create_Operator:
                                                                         create_op=True,
                                                                         return_label=True)
                             data_builder_train = dataset_train.get_Dataloader()
-                            print('Start Getting training Data')
                             X_train, y_train = data_builder_train.get_all_data_operator_modelling(dataset_filenames)
-                            print('Finish Getting training Data')
                             # dataset_pred_vectors = pred_vectors[dataset_name]
                             # dataset_predict = Image_Pipeline_Dataset(dataset_name,
                             #                                  create_op=True,
@@ -238,6 +282,7 @@ class Create_Operator:
                         
                         logger.info(f'Start the creation of operator in itteration {j}')
                         operator_ = create_ML_model(X=X_train, y=y_train, name='perceptron_regression')
+                       
                     else:
                         dataset_train = Pipeline_Dataset(dataset_filenames, norm=True, create_operator=True, ret_class=True)
                         X_train, y_train = data_builder_train.get_all_dataset_data()
@@ -261,7 +306,7 @@ class Create_Operator:
                         if not return_res:
                             self.save_csv_file(header=['Operator Name', 'Data Name', 'Acc', 'r^2', 'NRMSE', 'RMSE', 'MAE', 'MAD', 'MaPE', 'Exec time'],
                                                 record=[operator_name, dataset_name, '-', r2, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss, exec_time],
-                                                filename='results_out_new_vec.csv')
+                                                filename=self.out_file)
                         metrics_results_average['Exec time'] += exec_time
 
                     elif op.contains(operator_name.lower(), 'arima') or op.contains(operator_name.lower(), 'holt_winter'):
@@ -280,7 +325,7 @@ class Create_Operator:
                         if not return_res:
                             self.save_csv_file(header=['Operator Name', 'Data Name', 'Acc', 'r^2', 'NRMSE', 'RMSE', 'MAE', 'MAD', 'MaPE', 'Exec time'],
                                                 record=[operator_name, dataset_name, '-', r2, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss, exec_time],
-                                                filename='results_out_new_vec.csv')
+                                                filename=self.out_file)
                         
                         pred_y.append(y_pred)
                         label_y.append(y_test)
@@ -304,7 +349,7 @@ class Create_Operator:
                         if not return_res:
                             self.save_csv_file(header=['Operator Name', 'Data Name', 'Acc', 'r^2', 'NRMSE', 'RMSE', 'MAE', 'MAD', 'MaPE', 'Exec time'],
                                                 record=[operator_name, dataset_name, acc, '-', nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss, exec_time],
-                                                filename='results_out_new_vec.csv')
+                                                filename=self.out_file)
                         
                         pred_y.append(y_pred)
                         label_y.append(y_test)
@@ -345,5 +390,5 @@ class Create_Operator:
         else:
             self.save_csv_file(header=['Operator Name', 'Data Name', 'Acc', 'r^2', 'NRMSE', 'RMSE', 'MAE', 'MAD', 'MaPE', 'Exec time'],
                                                 record=[operator_name, 'Average All', metrics_results_average['Acc'], '-', metrics_results_average['NRMSE'], metrics_results_average['RMSE'], metrics_results_average['MAE'], metrics_results_average['MAD'], metrics_results_average['MaPE'], metrics_results_average['r^2']],
-                                                filename='results_out_new_vec.csv')
+                                                filename=self.out_file)
             print('in')

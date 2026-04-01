@@ -7,6 +7,8 @@ import logging
 import time
 import pickle
 import joblib
+from PIL import Image
+from tqdm import tqdm
 
 import numpy as np
 from torch.utils.data import DataLoader
@@ -20,6 +22,7 @@ from sklearn.metrics import silhouette_score
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 
+from transformers import AutoImageProcessor, AutoModel
 
 from utils_.utils import calculate_cosine_similarity
 import os
@@ -84,9 +87,11 @@ class Data_selection:
                 self.d_tokens = d_token
         else:
             if self.data_type == 3:
-                self.model = pipeline(task="image-feature-extraction", model_name="google/vit-base-patch16-224", pool=True, device='cuda', use_fast=True, max_new_tokens=d_token)
-                self.dataset = Image_Pipeline_Dataset(data_path=data_path, return_label=None, create_op=False)
+                self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+                self.processor = AutoImageProcessor.from_pretrained("google/vit-base-patch16-224")
+                self.model = AutoModel.from_pretrained("google/vit-base-patch16-224").to(self.device)
                 self.d_tokens = d_token
+                self.dataset = Image_Pipeline_Dataset(data_path=data_path, return_label=None)
             else:
                 self.model = None
                 self.dataset = None
@@ -124,7 +129,7 @@ class Data_selection:
             silioute_score.append(silhouette_avg)
             cluster_list.append(clusterer)
 
-        highest_score_idx = np.argmax(silhouette_avg)
+        highest_score_idx = np.argmax(silioute_score)
         best_cluster = cluster_list[highest_score_idx]
         best_labels = labels_list[highest_score_idx]
         centers = cluster_list[highest_score_idx].cluster_centers_
@@ -208,11 +213,22 @@ class Data_selection:
     
     def select_random(self, vect_dict, vectors, ratio=0.3):
         out_dict = {}
+        filenames_list = list(vect_dict.keys())
+        
+        num_to_select = int(np.floor(len(filenames_list) * ratio))
+        
         for dataset_name, vector_1 in vectors.items():
-            filenames_list = list(vect_dict.keys())
-            selected_data = np.random.choice(filenames_list, np.int_(np.floor(len(filenames_list) * ratio)), replace=False)
-            out_dict[dataset_name] = selected_data.tolist()
+            selected_names = np.random.choice(filenames_list, num_to_select, replace=False).tolist()
+            
+            selected_vectors = [vect_dict[name] for name in selected_names]
+            
+            out_dict[dataset_name] = [selected_names, selected_vectors]
 
+        out_dict = {
+            'selected_dataset': out_dict,
+            'Pred_Dataset': vectors
+        }
+        
         return out_dict
 
     def select_most_relevants_data(self, dict_, vectors, ratio=0.3, compare='desc'):
@@ -317,7 +333,7 @@ class Data_selection:
                     
                     features_, dataset_idx = batch_
                     features_ = features_.to(self.model.device)
-                    
+                    features_ = features_.type(torch.float64)
                     _, vectors, _ = self.model(features_)
 
                     vectors_output.append(vectors.detach().cpu().numpy())
@@ -346,20 +362,50 @@ class Data_selection:
             
         elif self.data_type == 3:
             DataBuilder = self.dataset.get_Dataloader()
-            imgs_filepath = DataBuilder.get_all_data()
-            vectors_out_tensors = self.model(imgs_filepath)
+            imgs_filepath = list(DataBuilder.get_all_data())
+            batch_size = 4
+            all_vectors = []
+            self.model.eval()
+
+            with torch.no_grad():
+                for i in tqdm(range(0, len(imgs_filepath), batch_size), desc="Extracting image vectors"):
+                    batch_paths = imgs_filepath[i : i + batch_size]
+                    
+                    # Load images
+                    batch_imgs = []
+                    for path in batch_paths:
+                        try:
+                            img = Image.open(path).convert("RGB")
+                            batch_imgs.append(img)
+                        except Exception as e:
+                            print(f"Error loading image {path}: {e}")
+                    
+                    if not batch_imgs:
+                        continue
+                        
+                    inputs = self.processor(images=batch_imgs, return_tensors="np")
+                    
+                    pixel_array_list = inputs["pixel_values"].tolist()
+                    pixel_values = torch.tensor(pixel_array_list, dtype=torch.float32).to(self.device)
+                    
+                    outputs = self.model(pixel_values=pixel_values)
+                    
+                    batch_vectors = outputs.pooler_output.cpu().numpy()
+                    all_vectors.append(batch_vectors)
+
+
+            vectors_out_np = np.vstack(all_vectors).astype(np.float64)
+
             vectors_dataset_idx_tensors = np.asarray(list(DataBuilder.idx_to_images.keys()))
 
-            vectors_out_np = [np.asarray(embd[0], dtype=np.float64) for embd in vectors_out_tensors]
-            vectors_out_np = np.asarray(vectors_out_np)
-            print(vectors_out_np.shape)
-            
             projector = GaussianRandomProjection(n_components=self.d_tokens, random_state=42)
             vectors_out_tensors = projector.fit_transform(vectors_out_np)
 
-            datasets_dict = self.convert_vectors_to_out_list(data_builder=DataBuilder,
-                                                            vectors=vectors_out_tensors,
-                                                            vectors_dataset_idx=vectors_dataset_idx_tensors)
+            datasets_dict = self.convert_vectors_to_out_list(
+                data_builder=DataBuilder,
+                vectors=vectors_out_tensors,
+                vectors_dataset_idx=vectors_dataset_idx_tensors
+            )
 
         if type_of_selection.lower() == 'cosine':
             compute_data = self.compute_similarity(vect_dict=self.vectors,
@@ -378,7 +424,8 @@ class Data_selection:
                                                                  vectors=datasets_dict,
                                                                  compare='desc')
         elif type_of_selection.lower() == 'random':
-            most_relevant_data = self.select_random(vect_dict=self.vectors, vectors=datasets_dict)
+            most_relevant_data = self.select_random(vect_dict=self.vectors, vectors=datasets_dict, ratio=data_ratio_selection)
+            type_of_selection = f'random_{data_ratio_selection}'
         elif type_of_selection.lower() == 'k-means':
             max_s = 0.5
             if data_ratio_selection > max_s:
@@ -390,9 +437,6 @@ class Data_selection:
                 most_relevant_data = self.vector_DB_Search(collection_name=self.qdrant_collection_name,
                                                                                vectors=datasets_dict,
                                                                                select_percent=data_ratio_selection)
-                # most_relevant_data = self.qdrant_controller.similarity_search_(collection_name=self.qdrant_collection_name,
-                #                                                                vectors=datasets_dict,
-                #                                                                select_percent=data_ratio_selection)
             else:
                 raise AssertionError('You must select the --vector-DB during the input')
         else:

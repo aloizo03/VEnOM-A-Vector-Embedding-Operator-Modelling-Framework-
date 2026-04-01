@@ -6,7 +6,7 @@ import numpy as np
 
 from permetrics.regression import RegressionMetric
 
-from sklearn.metrics import root_mean_squared_error
+from sklearn.metrics import mean_squared_error
 from sklearn.metrics import jaccard_score
 from sklearn.metrics.pairwise import cosine_similarity
 import sklearn.linear_model as linear
@@ -24,7 +24,7 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import accuracy_score, mean_absolute_error, median_absolute_error, mean_absolute_percentage_error, r2_score
 from sklearn import svm
 import scipy
-
+from utils_.image_ML_operators import CNN, fit
 from server.server_utils.qdrant_controller import qdrant_controller
 
 def get_file_modified_time(file):
@@ -220,8 +220,13 @@ def create_operator(name, X, y):
         operator = ExponentialSmoothing(y, trend='add')
         operator = operator.fit()
         return operator
-    
-    operator.fit(X=X, y=y)
+    elif name.lower() == 'cnn':
+        model = CNN()
+        
+    if name.lower == 'cnn':
+        operator = fit(model=model, train_data=X, train_y=y)
+    else:
+        operator.fit(X=X, y=y)
 
     
     return operator
@@ -253,7 +258,7 @@ def predict_operator(operator, X, y, ret_preds=False):
     
     mae_loss = mean_absolute_error(y, y_pred)
     mad_loss = median_absolute_error(y, y_pred)
-    rmse_loss = root_mean_squared_error(y, y_pred)
+    rmse_loss = mean_squared_error(y, y_pred, squared=True)
     MaPE_loss = mean_absolute_percentage_error(y, y_pred)
     if ret_preds:
         return acc, r_2_score, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss, y_pred
@@ -279,7 +284,8 @@ def predict_linear_regression_operator(operator, X, y, ret_preds=False):
     r2 = operator.score(X, y)
     mae_loss = mean_absolute_error(y, y_pred)
     mad_loss = median_absolute_error(y, y_pred)
-    rmse_loss = root_mean_squared_error(y, y_pred)
+    mse = mean_squared_error(y, y_pred)
+    rmse_loss = np.sqrt(mse)
     MaPE_loss = mean_absolute_percentage_error(y, y_pred)
 
     if ret_preds:
@@ -295,7 +301,8 @@ def get_metrics(y_pred, y_targets):
     r_2_score = r2_score(y_true=y_targets, y_pred=y_pred)
     mae_loss = mean_absolute_error(y_true=y_targets, y_pred=y_pred)
     mad_loss = median_absolute_error(y_true=y_targets, y_pred=y_pred)
-    rmse_loss = root_mean_squared_error(y_true=y_targets, y_pred=y_pred)
+    mse = mean_squared_error(y_targets, y_pred)
+    rmse_loss = np.sqrt(mse)
     MaPE_loss = mean_absolute_percentage_error(y_true=y_targets, y_pred=y_pred)
     
     return r_2_score, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss
@@ -308,7 +315,8 @@ def predict_local_outlier(operator, X, y):
     nrmse_loss = RegressionMetric(y, y_pred).normalized_root_mean_square_error()
     mae_loss = mean_absolute_error(y, y_pred)
     mad_loss = median_absolute_error(y, y_pred)
-    rmse_loss = root_mean_squared_error(y, y_pred)
+    mse = mean_squared_error(y, y_pred)
+    rmse_loss = np.sqrt(mse)
     MaPE_loss = mean_absolute_percentage_error(y, y_pred)
 
     return acc, r_2_score, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss
@@ -329,7 +337,8 @@ def predict_time_series_model(operator, X, y, operator_name, ret_preds=False):
     r_2_score = r2_score(y, y_pred)
     mae_loss = mean_absolute_error(y, y_pred)
     mad_loss = median_absolute_error(y, y_pred)
-    rmse_loss = root_mean_squared_error(y, y_pred)
+    mse = mean_squared_error(y, y_pred)
+    rmse_loss = np.sqrt(mse)
     MaPE_loss = mean_absolute_percentage_error(y, y_pred)
     if ret_preds:
         return r_2_score, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss, y_pred
@@ -350,7 +359,8 @@ def predict_dbscan(operator, X, y):
     
     mae_loss = mean_absolute_error(y, y_pred)
     mad_loss = median_absolute_error(y, y_pred)
-    rmse_loss = root_mean_squared_error(y, y_pred)
+    mse = mean_squared_error(y, y_pred)
+    rmse_loss = np.sqrt(mse)
     MaPE_loss = mean_absolute_percentage_error(y, y_pred)
     return acc, r_2_score, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss
 
