@@ -43,7 +43,10 @@ Step 1-Dataset Vectorization:
 ```
 $ python datasets_to_vec.py -ckpt "results/model_training/weights/best.pt" -i "/data/dataset/" -out "/results/experiments" -bz 8
 ```
-Adding the --graph as an argument implementing for graphs.
+Adding the -dt graph as an argument implementing for graphs, and -dt image implementing for images.
+</br>
+Adding the -s vectordb as an argument you select to store the vector collection into Vector Database
+
 
 Step 2-Similarity Search:
 </br>
@@ -51,7 +54,7 @@ On similarity search we give as an input the same model we did for the vectorisa
 ```
 $ python select_data.py -ckpt "results/model_training/weights/best.pt" -i "/data/dataset_2/dataset.csv" -out "/results/experiments" -v $VEC_DIR -s "k-means"
 ```
-Adding the --graph as an argument implementing for graphs.
+Adding the -dt graph as an argument implementing for graphs, and -dt image implementing for images.
 
 
 Step 3-Opeartor Modelling:
@@ -64,6 +67,13 @@ $ python train_exp.py -i "/data/dataset/" -out "/results/experiments" --query "l
 ```
 $ python3 operator_.py --dict-input sim_search.pickle -oi "/results/experiments/scores.csv" --out-path "/results/experiments" --operator 'linear_regression'
 ```
+
+Step 4-Dataset Evolution:
+</br>
+```
+$ python update_vectors.py ckpt "results/model_training/weights/best.pt" -i "/data/dataset/" -out "/results/experiments" -bz 8 -v collection_name -vs 300 -dt tabular -s vectordb -th 0.1
+```
+Adding the -dt graph as an argument implementing for graphs, and -dt image implementing for images.
 
 ### Pre-trained models for vectorisation
 On https://drive.google.com/drive/folders/1F6XF3p-sVwc8uyEtlDl806sODalb3rpj?usp=sharing, we are providing four models for vectorisation and must placed on results/ directory.
