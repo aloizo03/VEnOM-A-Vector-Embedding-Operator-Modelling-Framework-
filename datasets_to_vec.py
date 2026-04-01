@@ -44,7 +44,7 @@ def main():
                             save_to=save_to, 
                             d_token=d_token, 
                             collection_name=collection_name)
-
+    print('Start vector calculation')
     clustering.compute_vectors(batch_size=batch_size)
 
 if __name__ == '__main__':

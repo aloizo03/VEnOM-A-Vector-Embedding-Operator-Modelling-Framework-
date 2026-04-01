@@ -8,6 +8,8 @@ def main():
     parser.add_argument("-oi", "--operator-input", default=None, type=str, help="Directory to input operator operator/path/dir")
     parser.add_argument("-out", "--out-path", type=str, default="results/test",
                         help='Output path for the saving of the embeddings')
+    parser.add_argument("-outf", "--out-file", type=str, default="results.csv",
+                        help='Output filename')
     parser.add_argument('-o', '--operator', type=str, default='svm_sgd',
                         help='Type of data selection (sim, distance, random)')
     parser.add_argument('-r', '--repetitions', type=int, default=2, help='The amount of repetition of the experiment')
@@ -23,6 +25,7 @@ def main():
     repetitions = args.repetitions
     data_type_str = args.data_type
     target_labels = args.target_labels
+    out_file = args.out_file
 
     if data_type_str.lower() == 'tabular':
         data_type = 1
@@ -35,7 +38,7 @@ def main():
     
 
     # operator_class = Create_Operator(out_path=out_path, operator_dir=input_operator_dir)
-    operator_class = Create_Operator(out_path=out_path, operator_dir=None)
+    operator_class = Create_Operator(out_path=out_path, operator_dir=None, out_file=out_file)
     operator_class.create_operator(operator_name=operator_name,
                                    most_relevant_data_path=data_input_dict_path,
                                    repetitions=repetitions,

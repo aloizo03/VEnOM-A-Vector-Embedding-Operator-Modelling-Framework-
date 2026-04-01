@@ -1,20 +1,8 @@
-import torch
-
-import joblib
-
-from tqdm import tqdm
-import numpy as np
 import sys
-from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
+
 import argparse
 
 from utils_.dataset_update import Dataset_Evolution
-import matplotlib.pyplot as plt
-import logging
-import os
-import time
-import pickle
 from server.server_utils.qdrant_controller import qdrant_controller
 
  
@@ -26,6 +14,7 @@ def main():
     parser.add_argument("-out", "--out-path", type=str, default="results/test",
                         help='Output path for the saving of the embeddings')
     parser.add_argument('-v', '--vectors', type=str, help='vectors path or VectorDB collection name')
+    parser.add_argument('-th', '--threshold', type=float, default=0.0, help='Threshold with range [0,1], where check if the previous version similarity is bellow than the threshold to not recalculate it')
     parser.add_argument('-vt', '--vectors-time', type=str, default='', help='Dataset latest modified time path')
     parser.add_argument('-bz', '--batch-size', type=int, default=1, help='total batch size')
     parser.add_argument('-vs', '--vector-size', type=int, default=100, help='The vector embedding token dimension')
@@ -58,6 +47,7 @@ def main():
     d_token = args.vector_size
     collection_name = args.vectors
     dataset_latest_time = args.vectors_time
+    threshold = args.threshold
     if save_to.lower() == 'vectordb':
         print('Use vector DB')
         use_vectordb=True
@@ -80,7 +70,8 @@ def main():
                                             data_type=data_type, 
                                             data_times_path=dataset_latest_time, 
                                             use_vectorDB=use_vectordb, 
-                                            d_token=d_token)
+                                            d_token=d_token, 
+                                            threshold=threshold)
     
     dataset_evolution.update_vectors(batch_size=batch_size)
 
