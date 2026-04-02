@@ -1,5 +1,3 @@
-# python select_data.py -v "vectors_f-MNIST_VDBs_100_1762274534.608018_100" -i "/opt/dlami/nvme/Results/Image_Data/f-MNIST/f-mnist_test_venom.csv" -out "/home/ubuntu/Projects/Vector Embedding/results/f-mnist/100V-VDB/sim_search" -s "vectorDB" -r 0.2 -dt "image" --vector-db -vs 100 
-
 import torch
 from models.vectorEmbedding import Num2Vec
 from data.Dataset import Pipeline_Dataset, graph_Pipeline_Dataset, Image_Pipeline_Dataset
@@ -101,6 +99,9 @@ class Data_selection:
         if self.use_vec_db:
             self.qdrant_collection_name = vectors_path
             self.vectors = self.qdrant_controller.get_vectors(collection_name=vectors_path)
+
+            if self.vectors is None:
+                raise ValueError(f"CRITICAL: qdrant_controller.get_vectors() returned None for collection '{vectors_path}'. Check your Qdrant database!")
         else:
             if isinstance(vectors_path, str):
                 self.vectors = self.load_dict(vectors_path)
@@ -116,8 +117,21 @@ class Data_selection:
         silioute_score = []
         cluster_list = []
         labels_list = []
-        num_of_clusters = np.arange(start=2, stop=10, step=1, dtype=np.int_)
-        datasets_vectors = list(vect_dict.values())
+        
+        vect_names = list(vect_dict.keys())
+        datasets_vectors = np.array(list(vect_dict.values()))
+        n_samples = len(datasets_vectors)
+        
+        if n_samples < 3:
+            print("Not enough data to cluster. Returning all vectors.")
+            out_dict = {}
+            for dataset_name, vector in vectors.items():
+                out_dict[dataset_name] = [vect_names, datasets_vectors.tolist()]
+            return {'selected_dataset': out_dict, 'Pred_Dataset': vectors}
+
+        max_clusters = min(10, n_samples)
+        num_of_clusters = np.arange(start=2, stop=max_clusters, step=1, dtype=int)
+        
         for n_clusters in num_of_clusters:
             clusterer = KMeans(n_clusters=n_clusters, random_state=10)
             cluster_labels = clusterer.fit_predict(datasets_vectors)
@@ -125,68 +139,66 @@ class Data_selection:
             labels_list.append(cluster_labels)
 
             silhouette_avg = silhouette_score(datasets_vectors, cluster_labels)
-            logger.info(f"For n_clusters = {n_clusters} The average silhouette_score is : {silhouette_avg} ")
+            logger.info(f"For n_clusters = {n_clusters} The average silhouette_score is : {silhouette_avg}")
             silioute_score.append(silhouette_avg)
             cluster_list.append(clusterer)
 
         highest_score_idx = np.argmax(silioute_score)
         best_cluster = cluster_list[highest_score_idx]
         best_labels = labels_list[highest_score_idx]
-        centers = cluster_list[highest_score_idx].cluster_centers_
+        centers = best_cluster.cluster_centers_
 
         out_dict = {}
         for dataset_name, vector in vectors.items():
             label = best_cluster.predict([vector])[0]
-            selected_data_idx = [i for i, label_ in enumerate(best_labels) if label_ == label]
+            
+            # Find indices of points in this cluster
+            selected_data_idx = np.where(best_labels == label)[0].tolist()
             center = centers[label]
             
+            # Calculate thresholds once
+            min_required = int(np.ceil(min_s * n_samples))
+            max_allowed = int(np.ceil(max_s * n_samples))
 
-            if len(selected_data_idx) < np.ceil(min_s*len(datasets_vectors)):
+            if len(selected_data_idx) < min_required:
                 print(f"Cluster has too few points ({len(selected_data_idx)}). Adding more...")
+                needed = min_required - len(selected_data_idx)
 
                 other_indices = np.where(best_labels != label)[0]
-
-                other_data = [datasets_vectors[int(i)] for i in other_indices]
+                other_data = datasets_vectors[other_indices]
 
                 # Distance of other points to the target cluster center
                 distances = np.linalg.norm(other_data - center, axis=1)
-                
-                # Sort and get the index of the closest points
                 sorted_indices = np.argsort(distances)
 
-                needed = np.ceil(min_s*len(datasets_vectors)) - len(selected_data_idx)
-
-                selected_indices = [sorted_indices[i] for i in range(int(needed))]
-                selected_data_idx = selected_data_idx + selected_indices
+                selected_other_indices = [other_indices[sorted_indices[i]] for i in range(needed)]
+                selected_data_idx.extend(selected_other_indices)
                 
-                # Remove duplicates (if their any chance)
-                selected_data_idx = list(set(selected_data_idx))
-                print(selected_indices)
-                print(len(selected_indices))
+                selected_data_idx = list(set(selected_data_idx)) # Remove duplicates
 
-            elif len(selected_data_idx) > np.ceil(max_s*len(datasets_vectors)):
-                print(f"Cluster has too many points ({np.ceil(max_s*len(datasets_vectors))}). Removing...")
+            elif len(selected_data_idx) > max_allowed:
+                print(f"Cluster has too many points ({len(selected_data_idx)}). Removing...")
+                to_remove = len(selected_data_idx) - max_allowed
 
-                cluster_data = [datasets_vectors[i] for i in selected_data_idx]
+                cluster_data = datasets_vectors[selected_data_idx]
                 
                 distances = np.linalg.norm(cluster_data - center, axis=1)
+                # Sort descending (furthest first)
                 sorted_indices = np.argsort(distances)[::-1]
-                to_remove = len(selected_data_idx) - np.ceil(max_s*len(datasets_vectors))
-
-                remove_idx = [sorted_indices[i] for i in range(int(to_remove))]
-                removed_indices = [selected_data_idx[i] for i in remove_idx]
-                selected_data_idx = [i for i in selected_data_idx if i not in removed_indices]
-
                 
-            selected_datanames = [dataset_name for i, dataset_name in enumerate(vect_dict) if i in selected_data_idx]
-            sel_vectors = [vec for filename_, vec in self.vectors.items() if filename_ in selected_datanames]
+                remove_idx = [selected_data_idx[sorted_indices[i]] for i in range(to_remove)]
+                selected_data_idx = [i for i in selected_data_idx if i not in remove_idx]
+
+            # 3. Safely map indices back to filenames using the locked list
+            selected_datanames = [vect_names[i] for i in selected_data_idx]
+            sel_vectors = [self.vectors[name] for name in selected_datanames]
     
             out_dict[dataset_name] = [selected_datanames, sel_vectors]
 
         out_dict = {'selected_dataset': out_dict,
                     'Pred_Dataset': vectors}
+        
         return out_dict
-
     def compute_similarity(self, vect_dict, vectors):
         out_dict = {}
         for dataset_name, vector_1 in vectors.items():
