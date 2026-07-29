@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
 
+
 class EarlyStopping:
     def __init__(self, patience=5, min_delta=0):
         """
@@ -23,10 +24,9 @@ class EarlyStopping:
             self.counter = 0
         else:
             self.counter += 1
-        
+
         if self.counter >= self.patience:
             self.should_stop = True
-
 
 
 def get_scheduler(optimizer, schedule_type="none"):
@@ -43,7 +43,8 @@ def get_scheduler(optimizer, schedule_type="none"):
             optimizer, T_max=5
         )
 
-    return None 
+    return None
+
 
 class ImgDataset(torch.utils.data.Dataset):
     def __init__(self, X, y):
@@ -58,10 +59,10 @@ class ImgDataset(torch.utils.data.Dataset):
 
 
 class CNN(nn.Module):
-    def __init__(self, input_dim = (1, 32, 3), NUM_Class=10):
+    def __init__(self, in_channels=1, NUM_Class=10):
         super().__init__()
         self.features = nn.Sequential(
-            nn.Conv2d(input_dim, padding=1), nn.ReLU(),
+            nn.Conv2d(in_channels, 32, kernel_size=3, padding=1), nn.ReLU(),
             nn.MaxPool2d(2),
             nn.Conv2d(32, 64, 3, padding=1), nn.ReLU(),
             nn.MaxPool2d(2)
@@ -75,7 +76,8 @@ class CNN(nn.Module):
     def forward(self, x):
         x = self.features(x)
         return self.classifier(x)
-    
+
+
 class ResBlock(nn.Module):
     def __init__(self, c):
         super().__init__()
@@ -88,13 +90,14 @@ class ResBlock(nn.Module):
     def forward(self, x):
         return x + self.conv(x)
 
+
 class SmallResNet(nn.Module):
     def __init__(self):
         super().__init__()
         self.start = nn.Conv2d(1, 32, 3, padding=1)
         self.block1 = ResBlock(32)
         self.block2 = ResBlock(32)
-        self.pool = nn.AdaptiveAvgPool2d((1,1))
+        self.pool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(32, 10)
 
     def forward(self, x):
@@ -105,8 +108,10 @@ class SmallResNet(nn.Module):
         x = x.view(x.size(0), -1)
         return self.fc(x)
 
+
 import torch
 import torch.nn as nn
+
 
 class PatchEmbedding(nn.Module):
     def __init__(self, img_size=28, patch_size=7, in_ch=1, embed_dim=64):
@@ -122,10 +127,11 @@ class PatchEmbedding(nn.Module):
         )  # → (B, embed_dim, H/ps, W/ps)
 
     def forward(self, x):
-        x = self.proj(x)              # (B, embed_dim, n, n)
-        x = x.flatten(2)              # (B, embed_dim, patches)
-        x = x.transpose(1, 2)         # (B, patches, embed_dim)
+        x = self.proj(x)  # (B, embed_dim, n, n)
+        x = x.flatten(2)  # (B, embed_dim, patches)
+        x = x.transpose(1, 2)  # (B, patches, embed_dim)
         return x
+
 
 class MultiHeadSelfAttention(nn.Module):
     def __init__(self, embed_dim, num_heads):
@@ -135,6 +141,7 @@ class MultiHeadSelfAttention(nn.Module):
     def forward(self, x):
         out, _ = self.att(x, x, x)
         return out
+
 
 class TransformerEncoderBlock(nn.Module):
     def __init__(self, embed_dim=64, num_heads=4, mlp_ratio=4):
@@ -154,6 +161,7 @@ class TransformerEncoderBlock(nn.Module):
         x = x + self.att(self.ln1(x))
         x = x + self.mlp(self.ln2(x))
         return x
+
 
 class VisionTransformer(nn.Module):
     def __init__(self, img_size=28, patch_size=7, embed_dim=64, depth=4, num_heads=4, num_classes=10):
@@ -188,10 +196,11 @@ class VisionTransformer(nn.Module):
         return self.head(cls_out)
 
 
-def fit(model, train_data, train_y, val_data=None, val_y=None, use_val=False, val_fraction=0.2, batch_size=64, lr=1e-3, max_epochs=100, use_early_stopping=True, early_patience=5, scheduler_type="none"):
+def fit(model, train_data, train_y, val_data=None, val_y=None, use_val=False, val_fraction=0.2, batch_size=64, lr=1e-3,
+        max_epochs=100, use_early_stopping=True, early_patience=5, scheduler_type="none"):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = model.to(device)
-    
+
     loss_fn = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
     scheduler = get_scheduler(optimizer, scheduler_type)
@@ -263,8 +272,8 @@ def fit(model, train_data, train_y, val_data=None, val_y=None, use_val=False, va
             val_accs.append(val_acc)
 
             print(f"Epoch {epoch}/{max_epochs} | "
-                  f"Train Loss={train_loss:.4f}, Train Acc={train_acc*100:.2f}% | "
-                  f"Val Loss={val_loss:.4f}, Val Acc={val_acc*100:.2f}%")
+                  f"Train Loss={train_loss:.4f}, Train Acc={train_acc * 100:.2f}% | "
+                  f"Val Loss={val_loss:.4f}, Val Acc={val_acc * 100:.2f}%")
 
             # Scheduler update
             if scheduler_type == "plateau":
@@ -287,8 +296,7 @@ def fit(model, train_data, train_y, val_data=None, val_y=None, use_val=False, va
         else:
             # No validation mode
             print(f"Epoch {epoch}/{max_epochs} | "
-                  f"Train Loss={train_loss:.4f}, Train Acc={train_acc*100:.2f}%")
-
+                  f"Train Loss={train_loss:.4f}, Train Acc={train_acc * 100:.2f}%")
 
     return model
 

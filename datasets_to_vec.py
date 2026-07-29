@@ -1,22 +1,37 @@
+import os
+
+os.environ.setdefault('HF_HOME', os.path.join(os.getcwd(), '.hf_cache'))
+
 import argparse
 from utils_.vectors import Vectorise
 from utils_.utils import check_path
-import os
 
-# python datasets_to_vec.py --model-weight "/opt/dlami/nvme/Vector Embedding/results/Opt_Adam_HPC_in_all_dataset_tuples_e200_v300/weights/best.pt" --data-input "data/train_data_big_dataset" --out-path "results/test_big_datasets/" --batch-size 8
-# python select_data.py --model-weight "/opt/dlami/nvme/Vector Embedding/results/Opt_Adam_HPC_in_all_dataset_e200_v300/weights/best.pt" --data-input "data/test_big_data/dataset_0_286.csv" --out-path "results/test_big_datasets" --vectors "results/test_big_datasets/vectors_1723" --data-selection 'distance'
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-ckpt', '--model-weight', type=str, default=None, help="Model Weights for the Vector Embeddings")
+    parser.add_argument('-ckpt', '--model-weight', type=str, default=None,
+                        help="Model Weights for the Vector Embeddings")
     parser.add_argument("-i", "--data-input", type=str, help="Input datasets path f.e data/path/dir")
     parser.add_argument("-out", "--out-path", type=str, default="results/test",
                         help='Output path for the saving of the embeddings')
     parser.add_argument('-bz', '--batch-size', type=int, default=1, help='total batch size')
-    parser.add_argument('-cn', '--collection-name', type=str, default='collection_name', help='Set the vectors collection name')
+    parser.add_argument('-cn', '--collection-name', type=str, default='collection_name',
+                        help='Set the vectors collection name')
     parser.add_argument('-vs', '--vector-size', type=int, default=100, help='The vector embedding token dimension')
-    parser.add_argument("-dt", "--data-type", type=str, default='tabular', help='Available Data Type:\n\t-tabular: For tabular Dataset\n\t-graph: For Graph Dataset\n\t-Image: For Image Dataset')
-    parser.add_argument("-s", "--save-to", type=str, default='local', help="Where do you want to save the vector embedding representation:\n\t-s local: save to local repository output\n\t-s vectorDB: save to Qdrant Vector Database")
+    parser.add_argument("-dt", "--data-type", type=str, default='tabular',
+                        help='Available Data Type:\n\t-tabular: For tabular Dataset\n\t-graph: For Graph Dataset\n\t-Image: For Image Dataset')
+    parser.add_argument("-s", "--save-to", type=str, default='local',
+                        help="Where do you want to save the vector embedding representation:\n\t-s local: save to local repository output\n\t-s vectorDB: save to Qdrant Vector Database")
+    parser.add_argument("-tm", "--tab-model", type=str, default='num2vec', choices=['num2vec', 'tabfm', 'dataset2vec'],
+                        help="Model used to vectorise tabular datasets:\n\t-num2vec: the trained Num2Vec model (needs --model-weight)\n\t-tabfm: Google's TabFM foundation model (google/tabfm-1.0.0-pytorch); --model-weight is optional and may point to a local TabFM checkpoint dir\n\t-dataset2vec: the pretrained Dataset2Vec meta-feature model (hadijomaa/dataset2vec, 32-d vectors); --model-weight is optional and may point to a checkpoint dir")
+    parser.add_argument("--tabfm-task", type=str, default='regression', choices=['classification', 'regression'],
+                        help='Which TabFM backbone weights to use for the embeddings')
+    parser.add_argument("--tabfm-max-rows", type=int, default=512,
+                        help='Maximum number of rows per dataset sampled as TabFM context')
+    parser.add_argument("--d2v-split", type=int, default=0, choices=[0, 1, 2, 3, 4],
+                        help='Which pretrained Dataset2Vec checkpoint split to use')
+    parser.add_argument("--d2v-batches", type=int, default=10,
+                        help='Number of sampled batches averaged into each Dataset2Vec vector')
 
     args = parser.parse_args()
 
@@ -35,17 +50,24 @@ def main():
     elif data_type_str.lower() == 'image':
         data_type = 3
     else:
-        AssertionError('Wrong Data type available data types: \n\t-tabular: For tabular Dataset\n\t-graph: For Graph Dataset\n\t-Image: For Image Dataset')
-    
+        AssertionError(
+            'Wrong Data type available data types: \n\t-tabular: For tabular Dataset\n\t-graph: For Graph Dataset\n\t-Image: For Image Dataset')
+
     clustering = Vectorise(data_path=data_input_path,
-                            model_path=model_path,
-                            out_path=out_path,
-                            data_type=data_type,
-                            save_to=save_to, 
-                            d_token=d_token, 
-                            collection_name=collection_name)
+                           model_path=model_path,
+                           out_path=out_path,
+                           data_type=data_type,
+                           save_to=save_to,
+                           d_token=d_token,
+                           collection_name=collection_name,
+                           tab_model=args.tab_model,
+                           tabfm_task=args.tabfm_task,
+                           tabfm_max_rows=args.tabfm_max_rows,
+                           d2v_split=args.d2v_split,
+                           d2v_batches=args.d2v_batches)
     print('Start vector calculation')
     clustering.compute_vectors(batch_size=batch_size)
+
 
 if __name__ == '__main__':
     main()

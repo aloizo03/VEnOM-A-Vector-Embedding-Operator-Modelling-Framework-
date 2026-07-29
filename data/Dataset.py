@@ -158,7 +158,7 @@ class DataBuilder_Pipeline(data.Dataset):
                     self.datasets_data.append(pd.read_csv(self.datasets_filename))
                 else:
                     self.datasets_data.append(self.datasets_filename)
-                    
+
                 if self.ret_table:
                     self.data_len = len(self.datasets_data)
                 else:
@@ -282,7 +282,7 @@ class DataBuilder_Pipeline(data.Dataset):
         else:
             ret_array_np = data_set_lst
             ret_array_labels_np = labels_lst
-        
+
         if len(last_row_data_lst) >= 1:
             ret_lr_array_np = np.concatenate(last_row_data_lst, axis=0)
             ret_lr_array_labels_np = np.concatenate(last_label_lst, axis=0)
@@ -463,6 +463,7 @@ class Pipeline_Dataset:
                                     ret_class=self.ret_class,
                                     Vectors=self.vectors)
 
+
 class DataBuilder_Graph_Pipeline(data.Dataset):
 
     def __init__(self, data_path, vectors, labels_dict, datasets_path_lst, return_label=False):
@@ -475,7 +476,7 @@ class DataBuilder_Graph_Pipeline(data.Dataset):
 
         self.graph_list = []
         self.graph_dict = {}
-        
+
         for file in self.datasets_paths:
             graph = nx.read_edgelist(file, nodetype=int)
             node_to_int = nx.convert_node_labels_to_integers(graph)
@@ -488,10 +489,10 @@ class DataBuilder_Graph_Pipeline(data.Dataset):
 
     def get_dataset_name(self, idx):
         return self.idx_to_filename[idx]
-    
+
     # def get_all_data_operator_modelling(self):
     #     return self.vectors
-    
+
     def get_label(self, dataset_name):
         """
         Return the label (Y or class) for a given dataset_name path.
@@ -516,12 +517,16 @@ class DataBuilder_Graph_Pipeline(data.Dataset):
         if not label_cols:
             raise ValueError("No Y or class column found in dataframe.")
         label_col = label_cols[0]
-
         # Select the row
         match = self.labels_dicts.loc[self.labels_dicts[dataset_col] == dataset_name, label_col]
 
         # If no match exists
         if match.empty:
+            import logging
+            logging.getLogger(__name__).warning(
+                f"get_label: no match for '{dataset_name}' in column '{dataset_col}'. "
+                f"This label will be treated as NaN and filtered out."
+            )
             return None
 
         # Convert result to scalar (safely)
@@ -547,14 +552,14 @@ class DataBuilder_Graph_Pipeline(data.Dataset):
     def __len__(self):
         return self.data_len
 
-    
 
 class graph_Pipeline_Dataset:
     def __init__(self, data_path, Vectors=None, labels_dict=None, return_label=False):
         self.datasets_path = data_path
         self.vectors = Vectors
         self.labels_dict = labels_dict
-        self.return_label=return_label
+        self.return_label = return_label
+        self.datasets_path_lst = []
 
         check_path(path=self.datasets_path)
         if type(self.datasets_path) is list:
@@ -586,19 +591,23 @@ class graph_Pipeline_Dataset:
                                           return_label=self.return_label,
                                           datasets_path_lst=self.datasets_path_lst)
 
+
 class Image_Pipeline_Dataset:
-    def __init__(self, data_path, Vectors=None, labels_dict=None, labels_dict_path=None, return_label=False, create_op=False):
+    def __init__(self, data_path, Vectors=None, labels_dict=None, labels_dict_path=None, return_label=False,
+                 create_op=False):
         self.datasets_path = data_path
         self.vectors = Vectors
         self.labels_dict_path = labels_dict_path
         self.labels_dict = labels_dict
-        self.return_label=return_label
+        self.return_label = return_label
         self.create_op = create_op
+
+        self.datasets_path_lst = []  # <-- ADD THIS LINE
 
         check_path(path=self.datasets_path)
 
         if type(self.datasets_path) is list:
-            self.datasets_path_lst = self.datasets_path 
+            self.datasets_path_lst = self.datasets_path
         elif os.path.isdir(self.datasets_path):
             files_ = os.listdir(self.datasets_path)
             paths_ = []
@@ -608,18 +617,25 @@ class Image_Pipeline_Dataset:
             self.datasets_path_lst = paths_
         elif os.path.isfile(self.datasets_path):
             self.datasets_path_lst = [self.datasets_path]
+        else:
+            # <-- ADD THIS ELSE so the real cause surfaces immediately
+            raise FileNotFoundError(
+                f"Image_Pipeline_Dataset: '{self.datasets_path}' is not a list, "
+                f"an existing directory, or an existing file. "
+                f"Verify the path is correct and the file/directory exists."
+            )
 
     def get_Dataloader(self):
         if not self.create_op:
             return Databuilder_Image_Pipeline(data_path=self.datasets_path,
-                                            vectors=self.vectors,
-                                            labels_dict=self.labels_dict,
-                                            labels_dict_path=self.labels_dict_path,
-                                            return_label=self.return_label,
-                                            datasets_path_lst=self.datasets_path_lst,
-                                            create_op=self.create_op)
+                                              vectors=self.vectors,
+                                              labels_dict=self.labels_dict,
+                                              labels_dict_path=self.labels_dict_path,
+                                              return_label=self.return_label,
+                                              datasets_path_lst=self.datasets_path_lst,
+                                              create_op=self.create_op)
         else:
-            return Databuilder_Image_Pipeline_create_Op(data_path=self.datasets_path, 
+            return Databuilder_Image_Pipeline_create_Op(data_path=self.datasets_path,
                                                         vectors=self.vectors,
                                                         labels_dict=self.labels_dict,
                                                         labels_dict_path=self.labels_dict_path,
@@ -632,7 +648,7 @@ class Databuilder_Image_Pipeline_create_Op(data.Dataset):
 
     def __init__(self, data_path, vectors, labels_dict, labels_dict_path, return_label, datasets_path_lst, create_op):
         super().__init__()
-        
+
         self.data_path = data_path
         self.vectors = vectors
         self.labels_dicts = {}
@@ -648,41 +664,29 @@ class Databuilder_Image_Pipeline_create_Op(data.Dataset):
             df = labels_dict
             if self.labels_dict_path is not None:
                 df = update_img_fullpath(df=df,
-                                            filepath=self.labels_dict_path)
-            
-            class_name = self.detect_class_column(df)
+                                         filepath=self.labels_dict_path)
 
+            class_name = self.detect_class_column(df)
 
         for file in self.datasets_paths:
             filename_ = file.split('/')[-1].split('.')[0].upper()
 
-            # if labels_dict is not None:
-            #     if 'class' in labels_dict.columns:
-            #             class_labels = labels_dict.loc[:, labels_dict.columns.str.contains("class")].values.tolist()
-            #     elif 'Y' in labels_dict.columns:
-            #             class_labels = labels_dict.loc[:, labels_dict.columns.str.contains("Y")].values.tolist()
-            # else:
-            #     if 'class' in df.columns: 
-            #         class_labels = df.loc[:, df.columns.str.contains("class")].values.tolist()
-            #     elif 'Y' in df.columns: 
-            #         class_labels = df.loc[:, df.columns.str.contains("class")].values.tolist() 
-
             if labels_dict is None:
-                
+
                 # class_labels = np.asarray(class_labels, dtype=np.float64)
-                
+
                 # idx = filenames_lst.index(file)
                 try:
                     self.labels_dicts[file] = df.loc[df["filename"] == file, class_name].iloc[0]
                 except:
                     try:
-                        
+
                         self.labels_dicts[file] = df.loc[df["file_path"] == file, class_name].iloc[0]
                     except:
                         self.labels_dicts[file] = df.loc[df["Dataset Name"] == file, class_name].iloc[0]
                 # self.labels_dicts[filename] = class_labels
             else:
-                
+
                 try:
                     self.labels_dicts[file] = df.loc[df["filename"] == file, class_name].iloc[0]
                 except:
@@ -708,19 +712,19 @@ class Databuilder_Image_Pipeline_create_Op(data.Dataset):
 
     def get_dataset_filename_name(self, idx):
         return self.idx_to_filename[idx]
-    
+
     def get_all_filenames(self):
         return list(self.idx_to_filename.values())
-    
+
     def get_dataset_name(self, idx):
         return self.idx_to_images[idx]
-    
+
     def get_data_op_modelling(self, filename):
         return self.vectors, self.labels_dicts[filename]
-    
+
     def get_all_data_operator_modelling(self, dataset_filenames):
         ret_labels = [self.labels_dicts[filename] for filename in dataset_filenames]
-        
+
         if self.vectors is None:
             print('Inside here no vectors')
             labels_lst = []
@@ -732,15 +736,16 @@ class Databuilder_Image_Pipeline_create_Op(data.Dataset):
         else:
             return self.vectors, ret_labels
 
+
 class Databuilder_Image_Pipeline(data.Dataset):
-    
+
     def __init__(self, data_path, vectors, labels_dict, labels_dict_path, return_label, datasets_path_lst, create_op):
         super().__init__()
-        
+
         self.data_path = data_path
         self.vectors = vectors
         self.labels_dicts = {}
-        
+
         self.labels_dict_path = labels_dict_path
         self.datasets_paths = datasets_path_lst
         self.return_label = return_label
@@ -752,9 +757,15 @@ class Databuilder_Image_Pipeline(data.Dataset):
         if create_op:
             df = labels_dict
             if self.labels_dict_path is not None:
+
+                if 'filename' not in df.columns:
+                    if 'Dataset Name' in df.columns:
+                        df = df.rename(columns={'Dataset Name': 'filename'})
+                    elif 'file_path' in df.columns:
+                        df = df.rename(columns={'file_path': 'filename'})
+
                 df = update_img_fullpath(df=df,
-                                            filepath=self.labels_dict_path)
-                
+                                         filepath=self.labels_dict_path)
 
         for file in self.datasets_paths:
             filename_ = file.split('/')[-1].split('.')[0].upper()
@@ -762,14 +773,22 @@ class Databuilder_Image_Pipeline(data.Dataset):
                 pass
                 # df = labels_dict
                 # if self.labels_dict_path is not None:
+
+                #     # Same column-name normalization as in Databuilder_Image_Pipeline_create_Op
+                #     if 'filename' not in df.columns:
+                #         if 'Dataset Name' in df.columns:
+                #             df = df.rename(columns={'Dataset Name': 'filename'})
+                #         elif 'file_path' in df.columns:
+                #             df = df.rename(columns={'file_path': 'filename'})
+
                 #     df = update_img_fullpath(df=df,
                 #                             filepath=self.labels_dict_path)
             else:
                 df = pd.read_csv(file)
 
-                df = update_img_fullpath(df=df, 
-                                        filepath=file)
-            
+                df = update_img_fullpath(df=df,
+                                         filepath=file)
+
             try:
                 filenames_lst = df.loc[:, 'filename'].to_list()
             except:
@@ -794,19 +813,19 @@ class Databuilder_Image_Pipeline(data.Dataset):
 
             if labels_dict is not None:
                 if 'class' in labels_dict.columns:
-                        class_labels = labels_dict.loc[:, labels_dict.columns.str.contains("class")].values.tolist()
+                    class_labels = labels_dict.loc[:, labels_dict.columns.str.contains("class")].values.tolist()
                 elif 'Y' in labels_dict.columns:
-                        class_labels = labels_dict.loc[:, labels_dict.columns.str.contains("Y")].values.tolist()
+                    class_labels = labels_dict.loc[:, labels_dict.columns.str.contains("Y")].values.tolist()
             else:
-                if 'class' in df.columns: 
+                if 'class' in df.columns:
                     class_labels = df.loc[:, df.columns.str.contains("class")].values.tolist()
-                elif 'Y' in df.columns: 
-                    class_labels = df.loc[:, df.columns.str.contains("class")].values.tolist() 
+                elif 'Y' in df.columns:
+                    class_labels = df.loc[:, df.columns.str.contains("class")].values.tolist()
 
             if labels_dict is None:
-                
+
                 # class_labels = np.asarray(class_labels, dtype=np.float64)
-                for idx, filename in enumerate(filenames_lst):                
+                for idx, filename in enumerate(filenames_lst):
                     try:
                         self.labels_dicts[df.iloc[idx]['filename']] = class_labels[idx]
                     except:
@@ -816,7 +835,7 @@ class Databuilder_Image_Pipeline(data.Dataset):
                             self.labels_dicts[df.iloc[idx]['Dataset Name']] = class_labels[idx]
                 # self.labels_dicts[filename] = class_labels
             else:
-                
+
                 idx = self.datasets_paths.index(file)
                 try:
                     self.labels_dicts[df.iloc[idx]['filename']] = class_labels[idx]
@@ -833,19 +852,19 @@ class Databuilder_Image_Pipeline(data.Dataset):
 
     def get_dataset_filename_name(self, idx):
         return self.idx_to_filename[idx]
-    
+
     def get_all_filenames(self):
         return list(self.idx_to_filename.values())
-    
+
     def get_dataset_name(self, idx):
         return self.idx_to_images[idx]
-    
+
     def get_data_op_modelling(self, filename):
         return self.vectors, self.labels_dicts[filename]
-    
+
     def get_all_data_operator_modelling(self, dataset_filenames):
         ret_labels = [self.labels_dicts[filename] for filename in dataset_filenames]
-        
+
         if self.vectors is None:
             print('Inside here no vectors')
             labels_lst = []
@@ -856,12 +875,12 @@ class Databuilder_Image_Pipeline(data.Dataset):
             return data_lst, ret_labels
         else:
             return self.vectors, ret_labels
-    
+
     def get_all_data(self, read_dataset=False):
         if read_dataset:
             ret_data = self.read_datasets()
         else:
-            ret_data = self.image_list 
+            ret_data = self.image_list
 
         if self.return_label:
             labels_lst = []
@@ -874,12 +893,13 @@ class Databuilder_Image_Pipeline(data.Dataset):
 
     def __len__(self):
         return self.data_len
-    
+
     def read_datasets(self):
-        img_data =[np.transpose(cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)) for img_path in self.image_list]
+        img_data = [np.transpose(cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)) for img_path in self.image_list]
         img_data_norm = [x.astype(np.float32) / 255.0 for x in img_data]
         img_data_norm = [img.flatten() for img in img_data_norm]
         return img_data_norm
+
 
 class Dataset:
 

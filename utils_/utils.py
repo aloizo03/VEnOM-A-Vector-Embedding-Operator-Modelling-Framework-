@@ -21,18 +21,22 @@ from sklearn.multioutput import MultiOutputClassifier
 import networkx as nx
 from sklearn.model_selection import GridSearchCV
 
-from sklearn.metrics import accuracy_score, mean_absolute_error, median_absolute_error, mean_absolute_percentage_error, r2_score
+from sklearn.metrics import accuracy_score, mean_absolute_error, median_absolute_error, mean_absolute_percentage_error, \
+    r2_score
 from sklearn import svm
 import scipy
 from utils_.image_ML_operators import CNN, fit
 from server.server_utils.qdrant_controller import qdrant_controller
 
+
 def get_file_modified_time(file):
     return os.stat(file).st_ctime
+
 
 def get_vec_DB_collections():
     controler = qdrant_controller()
     return controler.get_all_colections()
+
 
 def calculate_accuracy(predictions, gt_labels):
     """
@@ -52,7 +56,7 @@ def calculate_accuracy(predictions, gt_labels):
 def check_path(path):
     if type(path) is list:
         for p in path:
-             if not os.path.exists(p):
+            if not os.path.exists(p):
                 AssertionError(f'Filepath {p} is not exist')
         return
     if not os.path.exists(path):
@@ -63,34 +67,54 @@ def get_parent_dir(filepath):
     head, tail = os.path.split(filepath)
     print(head, tail)
 
+
 def calculate_cosine_distance(a, b):
     cosine_distance = float(spatial.distance.cosine(a, b))
     return cosine_distance
-    
+
+
 def calculate_cosine_similarity(a, b):
     cosine_similarity = 1 - calculate_cosine_distance(a, b)
     return cosine_similarity
 
+
 def create_ML_model(name, X, y, n_layers=200):
-    if name.lower() == 'perceptron':
+    if name.lower() == 'perceptron' or name.lower() == 'mlp':
         operator = MultiOutputClassifier(linear.SGDClassifier(max_iter=1000, tol=1e-3, loss='perceptron'))
         operator.fit(X=X, Y=y)
-    elif name.lower() == 'perceptron_regression':
+    elif name.lower() == 'perceptron_regression' or name.lower() == 'mlp_regression':
         operator = neural_network.MLPRegressor(hidden_layer_sizes=n_layers, max_iter=1000, early_stopping=True)
         operator.fit(X=X, y=y)
+    elif name.lower() == 'linear_regression':
+        operator = linear.LinearRegression()
+        operator.fit(X=X, y=y)
+    elif name.lower() == 'logistic_regression':
+        operator = linear.LogisticRegression()
+        operator.fit(X=X, y=y)
+    elif name.lower() == 'svm':
+        operator = svm.SVC()
+        operator.fit(X=X, y=y)
+    elif name.lower() == 'svm_sgd':
+        operator = linear.SGDClassifier(max_iter=1000, tol=1e-3, loss='hinge')
+        operator.fit(X=X, y=y)
+    elif name.lower() == 'knn' or name.lower() == 'k_nearest_neighbors':
+        operator = KNeighborsClassifier(n_neighbors=3)
+
     return operator
+
 
 def freeman_generalization(centrality_dict):
     values = np.array(list(centrality_dict.values()))
-    
+
     if values.size == 0:
         return 0.0
-    
+
     max_c = np.max(values)
     n = len(values)
     if n <= 1:
         return 0
     return np.sum(max_c - values) / (n - 1)
+
 
 # --- Spectral Radius ---
 def spectral_radius(G):
@@ -98,32 +122,36 @@ def spectral_radius(G):
     eigenvalues = np.linalg.eigvals(A)
     return np.max(np.abs(eigenvalues))
 
+
 def page_rank(G):
     G = nx.convert_node_labels_to_integers(G)
-    max_pr =  max(nx.pagerank(G).values())
+    max_pr = max(nx.pagerank(G).values())
     return max_pr
 
-def img_svm(x_train,y_train, X_test, sgd=False):
+
+def img_svm(x_train, y_train, X_test, sgd=False):
     # Defining the parameters grid for GridSearchCV
-    param_grid={'C':[0.1,1,10,100],
-                'gamma':[0.0001,0.001,0.1,1],
-                'kernel':['rbf','poly']}
+    param_grid = {'C': [0.1, 1, 10, 100],
+                  'gamma': [0.0001, 0.001, 0.1, 1],
+                  'kernel': ['rbf', 'poly']}
 
     # Creating a support vector classifier
-    svc=svm.SVC(probability=True, decision_function_shape='ovo')
+    svc = svm.SVC(probability=True, decision_function_shape='ovo')
 
     # Creating a model using GridSearchCV with the parameters grid
-    model=GridSearchCV(svc,param_grid)
+    model = GridSearchCV(svc, param_grid)
 
-    model.fit(x_train,y_train)
+    model.fit(x_train, y_train)
 
     return model, model.predict(X_test)
+
 
 def create_image_operator(name, X, y, X_test):
     y_ret = []
     if name.lower() == 'img_svm' or name.lower() == 'image_svm':
         pass
-    
+
+
 def create_graph_operator(name, graph_list):
     y = []
 
@@ -184,6 +212,7 @@ def create_graph_operator(name, graph_list):
             continue
     return y
 
+
 def create_operator(name, X, y):
     print(name)
     if name.lower() == 'svm_sgd':
@@ -198,22 +227,22 @@ def create_operator(name, X, y):
         operator = linear.LogisticRegression()
     elif name.lower() == 'linear_regression':
         operator = linear.LinearRegression()
-    elif name.lower() == 'perceptron':
+    elif name.lower() == 'perceptron' or name.lower() == 'mlp':
         operator = linear.SGDClassifier(max_iter=1000, tol=1e-3, loss='perceptron')
-    elif name.lower() == 'mlpregression':
+    elif name.lower() == 'mlpregression' or name.lower() == 'mlp_regression':
         operator = neural_network.MLPRegressor()
     elif name.lower() == 'mlp_sgd':
         operator = neural_network.MLPClassifier(solver='sgd', alpha=1e-5, random_state=1)
     elif name.lower() == 'mlp_adam':
         operator = neural_network.MLPClassifier(solver='adam', alpha=1e-5, random_state=1)
     elif name.lower() == 'dbscan':
-        operator = DBSCAN(eps=0.5, min_samples=5)  
+        operator = DBSCAN(eps=0.5, min_samples=5)
     elif name.lower() == 'local_outlier_factor':
         operator = LocalOutlierFactor(n_neighbors=2)
-    elif name.lower() == 'knn':
+    elif name.lower() == 'knn' or name.lower() == 'k_nearest_neighbors':
         operator = KNeighborsClassifier(n_neighbors=3)
     elif name.lower() == 'arima':
-        operator = ARIMA(y, order=(1,1,0))
+        operator = ARIMA(y, order=(1, 1, 0))
         operator = operator.fit()
         return operator
     elif name.lower() == 'holt_winter':
@@ -222,19 +251,19 @@ def create_operator(name, X, y):
         return operator
     elif name.lower() == 'cnn':
         model = CNN()
-        
-    if name.lower == 'cnn':
+
+    if name.lower() == 'cnn':
         operator = fit(model=model, train_data=X, train_y=y)
     else:
         operator.fit(X=X, y=y)
 
-    
     return operator
 
+
 def fit_operator(operator, operator_name, X, y):
-    if operator_name.lower() == 'svm_sgd' or operator_name.lower() == 'logistic_regression_sgd' or operator_name.lower() == 'perceptron' or operator_name.lower() == 'mlpregression' or operator_name.lower() == 'mlp_sgd' or operator_name.lower() == 'mlp_adam' :
+    if operator_name.lower() == 'svm_sgd' or operator_name.lower() == 'logistic_regression_sgd' or operator_name.lower() == 'perceptron' or operator_name.lower() == 'mlpregression' or operator_name.lower() == 'mlp_sgd' or operator_name.lower() == 'mlp_adam':
         operator = operator.partial_fit(X=X, y=y)
-    elif operator_name.lower() == 'svm' or  operator_name.lower() == 'svm_mcc' or operator_name.lower() == 'logistic_regression':
+    elif operator_name.lower() == 'svm' or operator_name.lower() == 'svm_mcc' or operator_name.lower() == 'logistic_regression':
         operator = operator.fit(X=X, y=y)
     elif operator_name.lower() == 'linear_regression':
         operator = operator.fit(X=X, y=y, coef_array=operator.coef_)
@@ -248,34 +277,34 @@ def predict_operator(operator, X, y, ret_preds=False):
     y_pred = operator.predict(X)
 
     if len(y_pred) < 2:
-        y_pred = np.reshape(y_pred,(-1,y_pred.shape[0]))
+        y_pred = np.reshape(y_pred, (-1, y_pred.shape[0]))
         nrmse_loss = 1
     else:
         nrmse_loss = RegressionMetric(y, y_pred).normalized_root_mean_square_error()
-    
+
     acc = accuracy_score(y_true=y, y_pred=y_pred)
     r_2_score = r2_score(y, y_pred)
-    
+
     mae_loss = mean_absolute_error(y, y_pred)
     mad_loss = median_absolute_error(y, y_pred)
-    rmse_loss = mean_squared_error(y, y_pred, squared=True)
+    mse = mean_squared_error(y, y_pred)
+    rmse_loss = np.sqrt(mse)
     MaPE_loss = mean_absolute_percentage_error(y, y_pred)
     if ret_preds:
         return acc, r_2_score, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss, y_pred
     else:
         return acc, r_2_score, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss
-    
+
+
 def predict_linear_regression_operator(operator, X, y, ret_preds=False):
-    
     if not isinstance(y, (list, np.ndarray)):
         y = np.array([y])
         y[np.isnan(y)] = 0
 
     y_pred = operator.predict(X)
 
-    
     if len(y_pred) < 2:
-        y_pred = np.reshape(y_pred,(-1,y_pred.shape[0]))
+        y_pred = np.reshape(y_pred, (-1, y_pred.shape[0]))
         nrmse_loss = 1
     else:
         nrmse_loss = RegressionMetric(y, y_pred).normalized_root_mean_square_error()
@@ -293,8 +322,8 @@ def predict_linear_regression_operator(operator, X, y, ret_preds=False):
     else:
         return r2, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss
 
+
 def get_metrics(y_pred, y_targets):
-    
     nrmse_loss = RegressionMetric(y_true=y_targets, y_pred=y_pred).normalized_root_mean_square_error()
     nrmse_loss = np.average(nrmse_loss)
 
@@ -304,9 +333,9 @@ def get_metrics(y_pred, y_targets):
     mse = mean_squared_error(y_targets, y_pred)
     rmse_loss = np.sqrt(mse)
     MaPE_loss = mean_absolute_percentage_error(y_true=y_targets, y_pred=y_pred)
-    
+
     return r_2_score, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss
-    
+
 
 def predict_local_outlier(operator, X, y):
     y_pred = operator.fit_predict(X)
@@ -321,6 +350,7 @@ def predict_local_outlier(operator, X, y):
 
     return acc, r_2_score, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss
 
+
 def predict_time_series_model(operator, X, y, operator_name, ret_preds=False):
     if operator_name.lower() == 'arima':
         y_pred = operator.get_forecast(steps=X.shape[0])
@@ -329,11 +359,11 @@ def predict_time_series_model(operator, X, y, operator_name, ret_preds=False):
         y_pred = operator.forecast(steps=X.shape[0])
 
     if len(y_pred) < 2:
-        y_pred = np.reshape(y_pred,(-1,y_pred.shape[0]))
+        y_pred = np.reshape(y_pred, (-1, y_pred.shape[0]))
         nrmse_loss = 1
     else:
         nrmse_loss = RegressionMetric(y, y_pred).normalized_root_mean_square_error()
-    
+
     r_2_score = r2_score(y, y_pred)
     mae_loss = mean_absolute_error(y, y_pred)
     mad_loss = median_absolute_error(y, y_pred)
@@ -345,24 +375,26 @@ def predict_time_series_model(operator, X, y, operator_name, ret_preds=False):
     else:
         return r_2_score, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss
 
+
 def predict_dbscan(operator, X, y):
     y_pred = operator.fit_predict(X=X)
-    
+
     if len(y_pred) < 2:
-        y_pred = np.reshape(y_pred,(-1,y_pred.shape[0]))
+        y_pred = np.reshape(y_pred, (-1, y_pred.shape[0]))
         nrmse_loss = 1
     else:
         nrmse_loss = RegressionMetric(y, y_pred).normalized_root_mean_square_error()
-    
+
     acc = accuracy_score(y_true=y, y_pred=y_pred)
     r_2_score = r2_score(y, y_pred)
-    
+
     mae_loss = mean_absolute_error(y, y_pred)
     mad_loss = median_absolute_error(y, y_pred)
     mse = mean_squared_error(y, y_pred)
     rmse_loss = np.sqrt(mse)
     MaPE_loss = mean_absolute_percentage_error(y, y_pred)
     return acc, r_2_score, nrmse_loss, rmse_loss, mae_loss, mad_loss, MaPE_loss
+
 
 def standardize_data(data):
     mean = np.mean(data, axis=0)
@@ -372,8 +404,8 @@ def standardize_data(data):
 
     return standardized
 
-def compute_eig_value(X, y=None):
 
+def compute_eig_value(X, y=None):
     standardized_data = standardize_data(X)
     if standardized_data.ndim == 1:
         standardized_data = standardized_data.reshape(-1, 1)
@@ -395,7 +427,7 @@ def compute_eig_value(X, y=None):
 
 
 def compute_rank(X):
-        # dataset = X[i]
+    # dataset = X[i]
     n_rows = X.shape[0]
     s = np.arange(1, n_rows + 1)
     # Calculate ranks
@@ -405,13 +437,17 @@ def compute_rank(X):
     y_pred = np.sqrt(np.sum((overall_rank - s) ** 2))
     return y_pred
 
+
 def compute_sum(X):
-   return np.sum(X)
+    return np.sum(X)
+
 
 def compute_avg(X):
     return np.average(X)
 
+
 import os
+
 
 def safe_join(base, rel):
     base_parts = os.path.normpath(base).split(os.sep)
@@ -424,13 +460,23 @@ def safe_join(base, rel):
     return os.path.join(base, *rel_parts)
 
 
-
 def update_img_fullpath(df, filepath):
     head_path = os.path.dirname(filepath)
     head_path_abs = os.path.abspath(head_path)
 
     # Determine which column to use
-    col = "file_path" if "file_path" in df.columns else "filename"
+    if "file_path" in df.columns:
+        col = "file_path"
+    elif "filename" in df.columns:
+        col = "filename"
+    elif "Dataset Name" in df.columns:
+        col = "Dataset Name"
+    else:
+        raise KeyError(
+            f"update_img_fullpath: DataFrame has no recognised path column. "
+            f"Expected one of 'file_path', 'filename', 'Dataset Name'. "
+            f"Found: {df.columns.tolist()}"
+        )
 
     for index, row in df.iterrows():
         original = str(row[col]).strip()
@@ -464,7 +510,9 @@ def update_img_fullpath(df, filepath):
 
     return df
 
+
 import numpy as np
+
 
 def normalize_label(y):
     """
