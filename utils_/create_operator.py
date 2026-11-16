@@ -12,7 +12,7 @@ from scipy.stats import wilcoxon
 
 logger = logging.getLogger(__name__)
 
-CURRENT_MACHINE_ROOT = '/various/aloizou/Results/'
+CURRENT_MACHINE_ROOT = os.environ.get('VENOM_RESULTS_ROOT', 'results/')
 
 
 def _sanitize_test(X_test, y_test, dataset_name="unknown"):

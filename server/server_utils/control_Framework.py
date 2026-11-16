@@ -13,8 +13,9 @@ from utils_.exp_accuracy import EXP_Accuracy
 from utils_.create_operator import Create_Operator
 import pandas as pd
 
-scores_out_file = '/home/ubuntu/Projects/VectorEmbedding-Representation-/server/tmp_score_labels/'
-operators_out_file = '/home/ubuntu/Projects/VectorEmbedding-Representation-/server/tmp_operators/'
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+scores_out_file = os.environ.get('VENOM_SCORES_DIR', os.path.join(_REPO_ROOT, 'server', 'tmp_score_labels', ''))
+operators_out_file = os.environ.get('VENOM_OPERATORS_DIR', os.path.join(_REPO_ROOT, 'server', 'tmp_operators', ''))
 
 class control_Framework:
 

@@ -1,5 +1,5 @@
 #adult:
-#  -path: "/home/antreas/PycharmProjects/Vector Embedding/data/adult.csv"
+#  -path: "data/adult.csv"
 #  -numerical: []
 #  -float: []
 #  -text: []
@@ -7,7 +7,7 @@
 #  -class: []
 
 #adult_dataset:
-#  path: "C:/Users/antre/PycharmProjects/Vector Embedding/data/adult/adult.csv"
+#  path: "data/adult/adult.csv"
 #  numerical_continues: []
 #  numerical_integer: ['age', 'fnlwgt', 'educational-num', 'capital-gain', 'capital-loss', 'hours-per-week', 'race']
 #  text: ['workclass', 'education', 'marital-status', 'occupation', 'relationship', 'native-country']
@@ -16,7 +16,7 @@
 
 
 #wine_origin:
-#  path: "C:/Users/antre/PycharmProjects/Vector Embedding/data/wine_origin/wine.csv"
+#  path: "data/wine_origin/wine.csv"
 #  numerical_continues: ["Alcohol", "Malicacid", "Ash", "Alcalinity_of_ash", "Total_phenols", "Flavanoids", "Nonflavanoid_phenols", "Proanthocyanins", "Color_intensity", "Hue", "0D280_0D315_of_diluted_wines"]
 #  numerical_integer: ["Magnesium", "Proline"]
 #  text: []
@@ -24,7 +24,7 @@
 #  class: ["class"]
 
 #wine_quality:
-#  path: "C:/Users/antre/PycharmProjects/Vector Embedding/data/wine_quality/wine_quality.csv"
+#  path: "data/wine_quality/wine_quality.csv"
 #  numerical_continues: ["fixed_acidity", "volatile_acidity", "citric_acid", "residual_sugar", "chlorides", "free_sulfur_dioxide", "total_sulfur_dioxide", "density", "pH", "sulphates", "alcohol"]
 #  numerical_integer: []
 #  text: []

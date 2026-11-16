@@ -19,15 +19,18 @@ import gzip
 import numpy as np
 from collections import defaultdict
 
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+GRAPH_DATA_ROOT = os.environ.get('VENOM_GRAPH_DATA_ROOT', os.path.join(_REPO_ROOT, 'data'))
+
 def load_and_save_Collab():
     print("Mapping nodes to graphs")
-    with open("/opt/dlami/nvme/Results/Data/COLLAB/COLLAB/COLLAB_graph_indicator.txt") as f:
+    with open(os.path.join(GRAPH_DATA_ROOT, "COLLAB", "COLLAB", "COLLAB_graph_indicator.txt")) as f:
         graph_indicator = [int(line.strip()) for line in f]
     node_to_graph = {i + 1: gid for i, gid in enumerate(graph_indicator)}
 
     print("Adding graph labels")
     # Graph labels (for evaluation, optional)
-    with open("/opt/dlami/nvme/Results/Data/COLLAB/COLLAB/COLLAB_graph_labels.txt") as f:
+    with open(os.path.join(GRAPH_DATA_ROOT, "COLLAB", "COLLAB", "COLLAB_graph_labels.txt")) as f:
         graph_labels = [int(line.strip()) for line in f]
 
     print("Creating graphs")
@@ -41,7 +44,7 @@ def load_and_save_Collab():
 
     print("Adding edges to graphs")
     # Add edges
-    with open("/opt/dlami/nvme/Results/Data/COLLAB/COLLAB/COLLAB_A.txt") as f:
+    with open(os.path.join(GRAPH_DATA_ROOT, "COLLAB", "COLLAB", "COLLAB_A.txt")) as f:
         for line in f:
             u, v = map(int, line.strip().split(','))
             g_u = node_to_graph[u]
@@ -55,11 +58,11 @@ def load_and_save_Collab():
     graph_list = [nx.convert_node_labels_to_integers(graphs[i + 1]) for i in range(len(graph_labels))]
 
     print("Saving the list")
-    os.makedirs("/opt/dlami/nvme/Results/Data/COLLAB/Collab_graphs/graphs_edgelist", exist_ok=True)
+    os.makedirs(os.path.join(GRAPH_DATA_ROOT, "COLLAB", "Collab_graphs", "graphs_edgelist"), exist_ok=True)
     for i, g in enumerate(graph_list):
-        nx.write_edgelist(g, f"/opt/dlami/nvme/Results/Data/COLLAB/Collab_graphs/graphs_edgelist/graph_{i}.edgelist", data=False)
+        nx.write_edgelist(g, os.path.join(GRAPH_DATA_ROOT, "COLLAB", "Collab_graphs", "graphs_edgelist", f"graph_{i}.edgelist"), data=False)
 
-    with open("/opt/dlami/nvme/Results/Data/COLLAB/Collab_graphs/graphs_edgelist/graph_labels.csv", "w") as f:
+    with open(os.path.join(GRAPH_DATA_ROOT, "COLLAB", "Collab_graphs", "graphs_edgelist", "graph_labels.csv"), "w") as f:
         f.write("graph_id,label\n")
         for i, label in enumerate(graph_labels):
             f.write(f"{i},{label}\n")
@@ -134,27 +137,11 @@ def load_and_save_TUDataset(dataset_name='PROTEINS_full',
                 f.write(f"{i},{label}\n")
 
 
-# load_and_save_TUDataset(dataset_name='ENZYMES', 
-#                         graph_indicator_path='/opt/dlami/nvme/Results/Data/ENZYMES/ENZYMES_graph_indicator.txt',
-#                         graph_label_path='/opt/dlami/nvme/Results/Data/ENZYMES/ENZYMES_graph_labels.txt',
-#                         graph_file='/opt/dlami/nvme/Results/Data/ENZYMES/ENZYMES_A.txt',
-#                         outpath='/opt/dlami/nvme/Results/Data/ENZYMES/ENZYMES_Graphs')
-
-# load_and_save_TUDataset(dataset_name='ENZYMES', 
-#                         graph_indicator_path='/opt/dlami/nvme/Results/Data/ENZYMES/ENZYMES_graph_indicator.txt',
-#                         graph_label_path='/opt/dlami/nvme/Results/Data/ENZYMES/ENZYMES_graph_labels.txt',
-#                         graph_file='/opt/dlami/nvme/Results/Data/ENZYMES/ENZYMES_A.txt',
-#                         outpath='/opt/dlami/nvme/Results/Data/ENZYMES/ENZYMES_Graphs')
-
-# load_and_save_TUDataset(dataset_name='PROTEINS_full',
-#                         use_torch_geo=True,
-#                         outpath='/opt/dlami/nvme/Results/Data/PROTEINS/PROTEINS_edgelist')
-
 load_and_save_TUDataset(dataset_name='ENZYMES',
                         use_torch_geo=True,
-                        outpath='/opt/dlami/nvme/Results/Data/ENZYMES/ENZYMES_Graphs')
+                        outpath=os.path.join(GRAPH_DATA_ROOT, 'ENZYMES', 'ENZYMES_Graphs'))
 
 load_and_save_TUDataset(dataset_name='TWITTER-Real-Graph-Partial',
                         use_torch_geo=True,
-                        outpath='/opt/dlami/nvme/Results/Data/TWITTER-Real-Graph-Partial/TWITTER-Graphs')
+                        outpath=os.path.join(GRAPH_DATA_ROOT, 'TWITTER-Real-Graph-Partial', 'TWITTER-Graphs'))
 

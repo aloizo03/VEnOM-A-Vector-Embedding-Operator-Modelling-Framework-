@@ -29,7 +29,7 @@ PAPER_CKPT = RC.NUM2VEC_CKPT[DIM]
 
 TRAIN_DATA_CONFIG = "data/config.data.yaml"
 
-TRAIN = dict(epochs=100, batch_size=4, micro_batch=1, lr=5e-4, optimiser="Adam", val_frac=0.1)
+TRAIN = dict(epochs=100, batch_size=4, micro_batch=1, lr=0.001, optimiser="Adam", val_frac=0.1)
 TRAIN_SEEDS = [0]
 MAX_HOURS_PER_MODEL = None
 

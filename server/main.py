@@ -5,6 +5,7 @@ from utils_flask import *
 from threading import Thread
 import threading
 import sqlite3
+import os
 # from flask_socketio import SocketIO
 
 from flask import render_template, Response
@@ -21,9 +22,10 @@ controller_ = control_Framework()
 # @socketio.on("connect")
 # def handle_connect():
 #     print("Client connected!")
-database_file = '/home/ubuntu/Projects/VectorEmbedding-Representation-/server/server_utils/vector_OM.db'
-save_locally_folder = '/home/ubuntu/Projects/VectorEmbedding-Representation-/server/tmp_locally_store'
-save_sim_search_locally = "/home/ubuntu/Projects/VectorEmbedding-Representation-/server/sim_search_store"
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+database_file = os.environ.get('VENOM_DB_FILE', os.path.join(_REPO_ROOT, 'server', 'server_utils', 'vector_OM.db'))
+save_locally_folder = os.environ.get('VENOM_LOCAL_STORE', os.path.join(_REPO_ROOT, 'server', 'tmp_locally_store'))
+save_sim_search_locally = os.environ.get('VENOM_SIM_SEARCH_STORE', os.path.join(_REPO_ROOT, 'server', 'sim_search_store'))
 
 def get_db_connection():
     conn = sqlite3.connect(database_file)
@@ -216,7 +218,7 @@ def display_vec_dataset():
         avail_data_vectorisation[str(id_)] = vec_name
 
     displ_vec = DisplayVectorEmbeddingRepr(vec_emb_reprs=avail_data_vectorisation)
-    vec_dir = '/opt/dlami/nvme/Vector_Embedding/Results_Experiments_2/HPC_2K/200V/vectors_1731669493.3926575.pickle'
+    vec_dir = os.environ.get('VENOM_VECTORS_FILE', os.path.join(_REPO_ROOT, 'Results_Experiments_2', 'HPC_2K', '200V', 'vectors_1731669493.3926575.pickle'))
     conn.close()
     if request.method == 'POST':
         selected_data_vectors = avail_data_vectors_full[str(displ_vec.select_ver.data)]
@@ -360,7 +362,7 @@ def display_sim_vec_dataset():
     # data_vectorisation = {'1': 'data/hpc_vec.pkl', '2': 'data/hpc_weather.pkl'}
     displ_vec = DisplayVectorEmbeddingRepr(vec_emb_reprs=avil_vec_sim)
 
-    vec_ss_dir = '/opt/dlami/nvme/Vector_Embedding/Results_Experiments_2/HPC_2K/200V/Dataset_Selection/rel_data_cosine_1733225609.908662.pickle'
+    vec_ss_dir = os.environ.get('VENOM_SIM_SEARCH_FILE', os.path.join(_REPO_ROOT, 'Results_Experiments_2', 'HPC_2K', '200V', 'Dataset_Selection', 'rel_data_cosine_1733225609.908662.pickle'))
     conn.close()
     if request.method == 'POST':
         conn = get_db_connection()

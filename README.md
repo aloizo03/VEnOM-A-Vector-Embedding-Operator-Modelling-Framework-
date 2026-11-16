@@ -26,7 +26,7 @@ Model training:
 For tabular data:
 
 ```
-$ python train.py --data-config data/config.data.yaml --model-config models/model.config.yaml --epochs 100 --out-path "results/model_training" --optimiser Adam --learning-rate 0.0005 --lr-scheduler --batch-size 4
+$ python train.py --data-config data/config.data.yaml --model-config models/model.config.yaml --epochs 100 --out-path "results/model_training" --optimiser Adam --learning-rate 0.001 --lr-scheduler --batch-size 4
 ```
 
 For graph:
@@ -108,9 +108,21 @@ $ python train_exp.py -i "/data/dataset/" -out "/results/experiments" --query "l
 $ python3 operator_.py --dict-input sim_search.pickle -oi "/results/experiments/scores.csv" --out-path "/results/experiments" --operator 'linear_regression'
 ```
 
+### Reproducibility
+ 
+All results in the paper use random seed `0`, which seeds `random`, `numpy`, `torch` (CPU and CUDA) and the `random_state` of the surrogate models (`utils_/utils.py::set_global_seed`). Each experiment is repeated 10 times and the reported values are the mean and standard deviation over these runs.
+ 
+One seed per run:** the 10 runs use the seeds 0–9 (one per run), which makes every run individually reproducible:
+```
+$ python operator_.py -i sim_search.pickle -oi scores.csv -out results/experiments -o linear_regression --seeds 0 1 2 3 4 5 6 7 8 9
+$ python train_op_sr.py ... --seeds 0 1 2 3 4 5 6 7 8 9      # random-sampling (SR) baseline
+```
+ 
+The configuration of every component (Qdrant, Apollo, framework parameters, NumTabData2Vec training, hardware, seed) is listed in `results/configurations.csv`.
+ 
 ### Baseline: Apollo
 
-We use Apollo (Giannakopoulos et al.) as the baseline, run from its open-source implementation ([giagiannis/data-profiler](https://github.com/giagiannis/data-profiler), commit `<hash>`) without modification and with its default configuration, except for the sampling ratio, which we set to 0.1 and 0.2 (Apollo-SR 0.1 and Apollo-SR 0.2 in the paper).
+We use Apollo (Giannakopoulos et al.) as the baseline, run from its open-source implementation ([giagiannis/data-profiler](https://github.com/giagiannis/data-profiler), commit `master`) without modification and with its default configuration, except for the sampling ratio, which we set to 0.1 and 0.2 (Apollo-SR 0.1 and Apollo-SR 0.2 in the paper).
 Instructions for running Apollo are provided by its authors as shell scripts in the [`_scripts/`](https://github.com/giagiannis/data-profiler/tree/master/_scripts) folder of their repository.
 
 ### Hardware, configurations and timings
@@ -138,6 +150,8 @@ Run the server:
 ```
 python server/main.py
 ```
+
+All paths default to locations inside the repository and can be overridden with environment variables: `VENOM_DB_FILE` (default `server/server_utils/vector_OM.db`), `VENOM_LOCAL_STORE` (`server/tmp_locally_store`), `VENOM_SIM_SEARCH_STORE` (`server/sim_search_store`), `VENOM_SCORES_DIR` (`server/tmp_score_labels/`), `VENOM_OPERATORS_DIR` (`server/tmp_operators/`), `VENOM_VECTORS_FILE` (`Results_Experiments_2/HPC_2K/200V/vectors_1731669493.3926575.pickle`), `VENOM_SIM_SEARCH_FILE` (`Results_Experiments_2/HPC_2K/200V/Dataset_Selection/rel_data_cosine_1733225609.908662.pickle`), `VENOM_GRAPH_DATA_ROOT` (`data`, used by `data/pre_process_graph_data.py`) and `VENOM_RESULTS_ROOT` (`results/`, resolved against the working directory and used by `utils_/create_operator.py` and `nns_recall_benchmark.py`).
 
 </br>
 

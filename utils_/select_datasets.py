@@ -1,5 +1,3 @@
-# python select_data.py -v "vectors_f-MNIST_VDBs_100_1762274534.608018_100" -i "/opt/dlami/nvme/Results/Image_Data/f-MNIST/f-mnist_test_venom.csv" -out "/home/ubuntu/Projects/Vector Embedding/results/f-mnist/100V-VDB/sim_search" -s "vectorDB" -r 0.2 -dt "image" --vector-db -vs 100 
-
 import torch
 from models.vectorEmbedding import Num2Vec
 from models.tabfm_embedder import TabFMEmbedder, project_vectors
