@@ -1,10 +1,11 @@
-# python select_data.py -v "vectors_f-MNIST_VDBs_100_1762274534.608018_100" -i "/opt/dlami/nvme/Results/Image_Data/f-MNIST/f-mnist_test_venom.csv" -out "/home/ubuntu/Projects/Vector Embedding/results/f-mnist/100V-VDB/sim_search" -s "vectorDB" -r 0.2 -dt "image" --vector-db -vs 100
+# python select_data.py -v "vectors_f-MNIST_VDBs_100_1762274534.608018_100" -i "/opt/dlami/nvme/Results/Image_Data/f-MNIST/f-mnist_test_venom.csv" -out "/home/ubuntu/Projects/Vector Embedding/results/f-mnist/100V-VDB/sim_search" -s "vectorDB" -r 0.2 -dt "image" --vector-db -vs 100 
 
 import torch
 from models.vectorEmbedding import Num2Vec
 from models.tabfm_embedder import TabFMEmbedder, project_vectors
 from models.dataset2vec_embedder import Dataset2VecEmbedder
 from data.Dataset import Pipeline_Dataset, graph_Pipeline_Dataset, Image_Pipeline_Dataset
+import hashlib
 import logging
 import time
 import pickle
@@ -27,10 +28,12 @@ import matplotlib.colors as colors
 from transformers import AutoImageProcessor, AutoModel
 
 from utils_.utils import calculate_cosine_similarity
+from utils_.selection_k import selection_k
 import os
 from server.server_utils.qdrant_controller import qdrant_controller
 
 from transformers import pipeline
+
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +42,13 @@ class Data_selection:
 
     def __init__(self, data_path, out_path, vectors_path, model_path, data_type, use_vector_DB, d_token=100,
                  tab_model='num2vec', tabfm_task='classification', tabfm_max_rows=512,
-                 d2v_split=0, d2v_batches=10):
+                 d2v_split=0, d2v_batches=10, query_cache_dir=None):
         self.data_type = data_type
+        # query embeddings are computed once per (query set, embedder) and reused from
+        # this directory by every selection method (env VE_QUERY_CACHE as fallback)
+        self.query_cache_dir = query_cache_dir or os.environ.get('VE_QUERY_CACHE')
+        self.data_path = data_path
+        self.model_path = model_path
         self.use_vec_db = use_vector_DB
         self.tab_model = tab_model.lower()
 
@@ -55,9 +63,17 @@ class Data_selection:
                                           max_rows=tabfm_max_rows)
             self.dataset = Pipeline_Dataset(data_path=data_path, norm=False)
             self.d_tokens = d_token
+        elif self.data_type == 1 and self.tab_model == 'dataset2vec':
+            # same construction as utils_/vectors.py, so query vectors live in the same
+            # 32-d space as the stored Dataset2Vec collection
+            self.embedder = Dataset2VecEmbedder(checkpoint_dir=model_path,
+                                                split=d2v_split,
+                                                n_batches=d2v_batches)
+            self.dataset = Pipeline_Dataset(data_path=data_path, norm=False)
+            self.d_tokens = d_token
         elif model_path is not None:
             if self.data_type == 1:
-                ckpt = torch.load(model_path)
+                ckpt = torch.load(model_path, map_location=torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
 
                 model_info = ckpt['model_info']
                 input_dim = model_info['d_numerical']
@@ -73,29 +89,29 @@ class Data_selection:
                 table_input = model_info['ret_table']
 
                 self.model = Num2Vec(d_numerical=input_dim,
-                                     d_out=d_out,  # create a 3d representation
-                                     n_layers=num_layers,
-                                     d_token=d_tokens,
-                                     head_num=head_num,
-                                     attention_dropout=attention_dropout,
-                                     ffn_dropout=ffn_dropout,
-                                     ffn_dim=ffn_dim,
-                                     activation=activation,
-                                     train=False,
-                                     input_table=table_input,
-                                     d_k=dim_k)
+                                    d_out=d_out,  # create a 3d representation
+                                    n_layers=num_layers,
+                                    d_token=d_tokens,
+                                    head_num=head_num,
+                                    attention_dropout=attention_dropout,
+                                    ffn_dropout=ffn_dropout,
+                                    ffn_dim=ffn_dim,
+                                    activation=activation,
+                                    train=False,
+                                    input_table=table_input,
+                                    d_k=dim_k)
 
                 self.model.load_state_dict(ckpt['model_state_dict'])
                 self.dataset = Pipeline_Dataset(data_path=data_path,
-                                                norm=True,
-                                                ret_table=table_input,
-                                                k_dim=dim_k)
+                                            norm=True,
+                                            ret_table=table_input,
+                                            k_dim=dim_k)
                 self.d_tokens = dim_k
             elif self.data_type == 2:
                 self.model = joblib.load(model_path)
 
                 self.dataset = graph_Pipeline_Dataset(data_path=data_path,
-                                                      return_label=False)
+                                         return_label=False)
                 self.d_tokens = d_token
         else:
             if self.data_type == 3:
@@ -108,21 +124,20 @@ class Data_selection:
                 self.model = None
                 self.dataset = None
                 AssertionError('A model ckpt need to be provided')
-
+        
         self.output_path = out_path
         if self.use_vec_db:
             self.qdrant_collection_name = vectors_path
             self.vectors = self.qdrant_controller.get_vectors(collection_name=vectors_path)
 
             if self.vectors is None:
-                raise ValueError(
-                    f"CRITICAL: qdrant_controller.get_vectors() returned None for collection '{vectors_path}'. Check your Qdrant database!")
+                raise ValueError(f"CRITICAL: qdrant_controller.get_vectors() returned None for collection '{vectors_path}'. Check your Qdrant database!")
         else:
             if isinstance(vectors_path, str):
                 self.vectors = self.load_dict(vectors_path)
             elif isinstance(vectors_path, dict):
                 self.vectors = vectors_path
-
+    
         logging.basicConfig(filename=os.path.join(self.output_path, 'log_file.log'),
                             encoding='utf-8',
                             level=logging.DEBUG)
@@ -132,11 +147,11 @@ class Data_selection:
         silioute_score = []
         cluster_list = []
         labels_list = []
-
+        
         vect_names = list(vect_dict.keys())
         datasets_vectors = np.array(list(vect_dict.values()))
         n_samples = len(datasets_vectors)
-
+        
         if n_samples < 3:
             print("Not enough data to cluster. Returning all vectors.")
             out_dict = {}
@@ -146,11 +161,11 @@ class Data_selection:
 
         max_clusters = min(10, n_samples)
         num_of_clusters = np.arange(start=2, stop=max_clusters, step=1, dtype=int)
-
+        
         for n_clusters in num_of_clusters:
             clusterer = KMeans(n_clusters=n_clusters, random_state=10)
             cluster_labels = clusterer.fit_predict(datasets_vectors)
-
+            
             labels_list.append(cluster_labels)
 
             silhouette_avg = silhouette_score(datasets_vectors, cluster_labels)
@@ -166,14 +181,14 @@ class Data_selection:
         out_dict = {}
         for dataset_name, vector in vectors.items():
             label = best_cluster.predict([vector])[0]
-
+            
             # Find indices of points in this cluster
             selected_data_idx = np.where(best_labels == label)[0].tolist()
             center = centers[label]
-
+            
             # Calculate thresholds once
-            min_required = int(np.ceil(min_s * n_samples))
-            max_allowed = int(np.ceil(max_s * n_samples))
+            min_required = selection_k(min_s, n_samples)
+            max_allowed = selection_k(max_s, n_samples)
 
             if len(selected_data_idx) < min_required:
                 print(f"Cluster has too few points ({len(selected_data_idx)}). Adding more...")
@@ -188,37 +203,36 @@ class Data_selection:
 
                 selected_other_indices = [other_indices[sorted_indices[i]] for i in range(needed)]
                 selected_data_idx.extend(selected_other_indices)
-
-                selected_data_idx = list(set(selected_data_idx))  # Remove duplicates
+                
+                selected_data_idx = list(set(selected_data_idx)) # Remove duplicates
 
             elif len(selected_data_idx) > max_allowed:
                 print(f"Cluster has too many points ({len(selected_data_idx)}). Removing...")
                 to_remove = len(selected_data_idx) - max_allowed
 
                 cluster_data = datasets_vectors[selected_data_idx]
-
+                
                 distances = np.linalg.norm(cluster_data - center, axis=1)
                 # Sort descending (furthest first)
                 sorted_indices = np.argsort(distances)[::-1]
-
+                
                 remove_idx = [selected_data_idx[sorted_indices[i]] for i in range(to_remove)]
                 selected_data_idx = [i for i in selected_data_idx if i not in remove_idx]
 
             # 3. Safely map indices back to filenames using the locked list
             selected_datanames = [vect_names[i] for i in selected_data_idx]
             sel_vectors = [self.vectors[name] for name in selected_datanames]
-
+    
             out_dict[dataset_name] = [selected_datanames, sel_vectors]
 
         out_dict = {'selected_dataset': out_dict,
                     'Pred_Dataset': vectors}
-
+        
         return out_dict
-
     def compute_similarity(self, vect_dict, vectors):
         out_dict = {}
         for dataset_name, vector_1 in vectors.items():
-            tmp_dict = {}
+            tmp_dict ={}
             for dataset_name_2, vector_2 in vect_dict.items():
                 sim_ = calculate_cosine_similarity(a=vector_1,
                                                    b=vector_2)
@@ -232,31 +246,31 @@ class Data_selection:
         # Euclidean distance
         out_dict = {}
         for dataset_name, vector_1 in vectors.items():
-            tmp_dict = {}
+            tmp_dict ={}
             for dataset_name_2, vector_2 in vect_dict.items():
                 dist_ = np.linalg.norm(vector_1 - vector_2)
                 tmp_dict[dataset_name_2] = dist_
             out_dict[dataset_name] = tmp_dict
         return out_dict
-
+    
     def select_random(self, vect_dict, vectors, ratio=0.3):
         out_dict = {}
         filenames_list = list(vect_dict.keys())
-
-        num_to_select = int(np.floor(len(filenames_list) * ratio))
-
+        
+        num_to_select = selection_k(ratio, len(filenames_list))
+        
         for dataset_name, vector_1 in vectors.items():
             selected_names = np.random.choice(filenames_list, num_to_select, replace=False).tolist()
-
+            
             selected_vectors = [vect_dict[name] for name in selected_names]
-
+            
             out_dict[dataset_name] = [selected_names, selected_vectors]
 
         out_dict = {
             'selected_dataset': out_dict,
             'Pred_Dataset': vectors
         }
-
+        
         return out_dict
 
     def select_most_relevants_data(self, dict_, vectors, ratio=0.3, compare='desc'):
@@ -269,11 +283,13 @@ class Data_selection:
                 data_dict_sorted = {k: v for k, v in sorted(data_dict.items(), key=lambda x: x[1], reverse=True)}
 
             datasets_filenames = list(data_dict_sorted.keys())
-            top_k = int(len(datasets_filenames) * ratio)
-
+            top_k = selection_k(ratio, len(datasets_filenames))
+            
             sel_dataset = datasets_filenames[:top_k]
-            sel_vectors = [vec for filename_, vec in self.vectors.items() if filename_ in sel_dataset]
-
+            # vectors in the SAME order as sel_dataset: downstream code zips the two lists
+            # position by position (data/Dataset.py get_all_dataset_data_sr)
+            sel_vectors = [self.vectors[name] for name in sel_dataset]
+            
             ret_dict[dataset_name] = [sel_dataset, sel_vectors]
         ret_dict = {'selected_dataset': ret_dict,
                     'Pred_Dataset': vectors}
@@ -297,34 +313,33 @@ class Data_selection:
             out_data[dataset_name] = vector
         return out_data
 
-    def plot_representation(self, dict_vectors, new_vectors_, new_dataset_names, dataset_builder, most_relevant,
-                            ratio=0.3):
+    def plot_representation(self, dict_vectors, new_vectors_, new_dataset_names, dataset_builder, most_relevant, ratio=0.3):
         colors_lst = list(colors.TABLEAU_COLORS.keys())
         plt.set_loglevel('info')
 
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
-
+        
         for new_vector_, data_idx in zip(new_vectors_, new_dataset_names):
             data_name = dataset_builder.get_dataset_name(data_idx)
             most_rel = most_relevant[data_name]
             vec_np = np.array(list(dict_vectors.values()))
-
-            labels_ = ['Relevant Dataset' if i in most_rel else 'Data Lake' for i in dict_vectors.keys()]
-
+            
+            labels_ = ['Relevant Dataset' if i in most_rel else 'Data Lake' for i in dict_vectors.keys()]            
+            
             vec_concat_np = np.concatenate((vec_np, [new_vector_]), axis=0)
 
             pca = PCA(n_components=3)
             result = pca.fit_transform(vec_concat_np)
             unique = list(set(labels_))
             for i, u in enumerate(unique):
+
                 vec_ = [result[j, :] for j in range(len(labels_)) if labels_[j] == u]
                 np_arr_vec = np.asarray(vec_, dtype=np.float64)
-
+           
                 ax.scatter(np_arr_vec[:, 0], np_arr_vec[:, 1], np_arr_vec[:, 2], c=colors_lst[i], label=u)
-            ax.scatter(result[vec_np.shape[0]:, 0], result[vec_np.shape[0]:, 1], result[vec_np.shape[0]:, 2],
-                       c='purple', label='New Data')
-
+            ax.scatter(result[vec_np.shape[0]:, 0], result[vec_np.shape[0]:, 1], result[vec_np.shape[0]:, 2], c='purple', label='New Data')
+                
         ax.legend()
         ax.grid(True)
 
@@ -335,8 +350,7 @@ class Data_selection:
         out_dict = {}
         res_dict = {}
         for dataset_name, vector in vectors.items():
-            sim_search_vecs = self.qdrant_controller.similarity_search_(collection_name=collection_name, vectors=vector,
-                                                                        select_percent=select_percent)
+            sim_search_vecs = self.qdrant_controller.similarity_search_(collection_name=collection_name, vectors=vector, select_percent=select_percent)
 
             print(f'Similarity search for {dataset_name} done')
             # sel_dataset = datasets_filenames[:top_k]
@@ -346,24 +360,67 @@ class Data_selection:
         out_dict = {'selected_dataset': res_dict, 'Pred_Dataset': vectors}
         return out_dict
 
-    def find_relevant_datasets(self, type_of_selection, data_ratio_selection, plot_representation=True,
-                               saved_sim_search=True):
+    def _query_cache_path(self):
+        if not self.query_cache_dir:
+            return None
+        if isinstance(self.data_path, (list, tuple)):
+            inputs = sorted(map(str, self.data_path))
+        elif os.path.isdir(self.data_path):
+            inputs = sorted(os.listdir(self.data_path))
+        else:
+            inputs = [str(self.data_path)]
+        key = repr((self.data_type, self.tab_model, str(self.model_path), int(self.d_tokens),
+                    str(self.data_path), inputs))
+        digest = hashlib.sha1(key.encode()).hexdigest()[:16]
+        return os.path.join(self.query_cache_dir, f'query_vectors_{digest}.pickle')
+
+    def _load_query_cache(self):
+        path = self._query_cache_path()
+        if path and os.path.isfile(path):
+            with open(path, 'rb') as handle:
+                cached = pickle.load(handle)
+            logger.info(f'Query embeddings loaded from cache {path}')
+            return cached['datasets_dict']
+        return None
+
+    def _save_query_cache(self, datasets_dict, embed_time):
+        path = self._query_cache_path()
+        if not path:
+            return
+        os.makedirs(self.query_cache_dir, exist_ok=True)
+        tmp = path + f'.{os.getpid()}.tmp'
+        with open(tmp, 'wb') as handle:
+            pickle.dump({'datasets_dict': datasets_dict, 'embed_time_s': embed_time,
+                         'data_path': self.data_path, 'model_path': self.model_path,
+                         'data_type': self.data_type, 'tab_model': self.tab_model, 'd_token': self.d_tokens},
+                        handle, protocol=pickle.HIGHEST_PROTOCOL)
+        os.replace(tmp, path)
+        logger.info(f'Query embeddings computed in {embed_time:.3f}s and cached to {path}')
+
+    def find_relevant_datasets(self, type_of_selection, data_ratio_selection, plot_representation=True, saved_sim_search=True):
 
         start_time = time.time()
-        self.data_type
-        if self.data_type == 1 and self.tab_model == 'tabfm':
+        cached_queries = self._load_query_cache()
+        if cached_queries is not None:
+            # identical query embeddings for every selection method (no re-embedding)
+            datasets_dict = cached_queries
+            DataBuilder = vectors_out_tensors = vectors_dataset_idx_tensors = None
+        elif self.data_type == 1 and self.tab_model in ('tabfm', 'dataset2vec'):
             DataBuilder = self.dataset.get_Dataloader()
             dataset_idxs = list(DataBuilder.idx_to_filename.keys())
             raw_vectors = []
             for idx in tqdm(dataset_idxs, desc='Extracting TabFM dataset vectors'):
                 filepath = DataBuilder.idx_to_filename[idx]
                 raw_vectors.append(self.embedder.embed_file(filepath))
+            # same deterministic projection as during vector creation, so the
+            # query vectors live in the same k-dim space as the stored ones
+            # vectors_out_tensors = project_vectors(np.vstack(raw_vectors), self.d_tokens)
             vectors_out_tensors = np.vstack(raw_vectors)
             vectors_dataset_idx_tensors = np.asarray(dataset_idxs)
 
             datasets_dict = self.convert_vectors_to_out_list(data_builder=DataBuilder,
-                                                             vectors=vectors_out_tensors,
-                                                             vectors_dataset_idx=vectors_dataset_idx_tensors)
+                                                            vectors=vectors_out_tensors,
+                                                            vectors_dataset_idx=vectors_dataset_idx_tensors)
         elif self.data_type == 1:
             vectors_output = []
             vectors_dataset_idx = []
@@ -374,6 +431,7 @@ class Data_selection:
 
             with torch.no_grad():
                 for batch_idx, batch_ in enumerate(dataloader):
+                    
                     features_, dataset_idx = batch_
                     features_ = features_.to(self.model.device)
                     features_ = features_.type(torch.float64)
@@ -386,10 +444,10 @@ class Data_selection:
 
             vectors_out_tensors = np.concatenate(vectors_output, axis=0)
             vectors_dataset_idx_tensors = np.concatenate(vectors_dataset_idx, axis=0)
-
+            
             datasets_dict = self.convert_vectors_to_out_list(data_builder=DataBuilder,
-                                                             vectors=vectors_out_tensors,
-                                                             vectors_dataset_idx=vectors_dataset_idx_tensors)
+                                                            vectors=vectors_out_tensors,
+                                                            vectors_dataset_idx=vectors_dataset_idx_tensors)
         elif self.data_type == 2:
             DataBuilder = self.dataset.get_Dataloader()
             data_graphs = DataBuilder.get_all_data()
@@ -397,12 +455,12 @@ class Data_selection:
             vectors_dataset_idx_tensors = np.asarray(list(DataBuilder.idx_to_filename.keys()))
 
             datasets_dict = self.convert_vectors_to_out_list(data_builder=DataBuilder,
-                                                             vectors=vectors_out_tensors,
-                                                             vectors_dataset_idx=vectors_dataset_idx_tensors)
-
+                                                            vectors=vectors_out_tensors,
+                                                            vectors_dataset_idx=vectors_dataset_idx_tensors)
+            
             self.d_tokens = vectors_out_tensors[0].shape[0]
             print(self.d_tokens)
-
+            
         elif self.data_type == 3:
             DataBuilder = self.dataset.get_Dataloader()
             imgs_filepath = list(DataBuilder.get_all_data())
@@ -412,8 +470,8 @@ class Data_selection:
 
             with torch.no_grad():
                 for i in tqdm(range(0, len(imgs_filepath), batch_size), desc="Extracting image vectors"):
-                    batch_paths = imgs_filepath[i: i + batch_size]
-
+                    batch_paths = imgs_filepath[i : i + batch_size]
+                    
                     # Load images
                     batch_imgs = []
                     for path in batch_paths:
@@ -422,19 +480,20 @@ class Data_selection:
                             batch_imgs.append(img)
                         except Exception as e:
                             print(f"Error loading image {path}: {e}")
-
+                    
                     if not batch_imgs:
                         continue
-
+                        
                     inputs = self.processor(images=batch_imgs, return_tensors="np")
-
+                    
                     pixel_array_list = inputs["pixel_values"].tolist()
                     pixel_values = torch.tensor(pixel_array_list, dtype=torch.float32).to(self.device)
-
+                    
                     outputs = self.model(pixel_values=pixel_values)
-
+                    
                     batch_vectors = outputs.pooler_output.cpu().numpy()
                     all_vectors.append(batch_vectors)
+
 
             vectors_out_np = np.vstack(all_vectors).astype(np.float64)
 
@@ -449,14 +508,17 @@ class Data_selection:
                 vectors_dataset_idx=vectors_dataset_idx_tensors
             )
 
+        if cached_queries is None:
+            self._save_query_cache(datasets_dict, time.time() - start_time)
+
         if type_of_selection.lower() == 'cosine':
             compute_data = self.compute_similarity(vect_dict=self.vectors,
                                                    vectors=datasets_dict)
             most_relevant_data = self.select_most_relevants_data(dict_=compute_data,
                                                                  ratio=data_ratio_selection,
                                                                  vectors=datasets_dict,
-                                                                 compare='asc')
-
+                                                                 compare='asc')    
+                   
         elif type_of_selection.lower() == 'distance':
             compute_data = self.compute_distance(vect_dict=self.vectors,
                                                  vectors=datasets_dict)
@@ -466,32 +528,30 @@ class Data_selection:
                                                                  vectors=datasets_dict,
                                                                  compare='desc')
         elif type_of_selection.lower() == 'random':
-            most_relevant_data = self.select_random(vect_dict=self.vectors, vectors=datasets_dict,
-                                                    ratio=data_ratio_selection)
+            most_relevant_data = self.select_random(vect_dict=self.vectors, vectors=datasets_dict, ratio=data_ratio_selection)
             type_of_selection = f'random_{data_ratio_selection}'
         elif type_of_selection.lower() == 'k-means':
             max_s = 0.5
             if data_ratio_selection > max_s:
                 max_s = data_ratio_selection + 0.1
-            most_relevant_data = self.compute_KMeans_cluster(vect_dict=self.vectors, vectors=datasets_dict,
-                                                             min_s=data_ratio_selection, max_s=max_s)
+            most_relevant_data = self.compute_KMeans_cluster(vect_dict=self.vectors, vectors=datasets_dict, min_s=data_ratio_selection, max_s=max_s)
         elif type_of_selection.lower() == 'vectordb':
             if self.use_vec_db:
-
+                
                 most_relevant_data = self.vector_DB_Search(collection_name=self.qdrant_collection_name,
-                                                           vectors=datasets_dict,
-                                                           select_percent=data_ratio_selection)
+                                                                               vectors=datasets_dict,
+                                                                               select_percent=data_ratio_selection)
             else:
                 raise AssertionError('You must select the --vector-DB during the input')
         else:
             raise AssertionError('Wrong type of dataset selection!!')
         logger.info(f'Execution time for {type_of_selection} : {time.time() - start_time}')
-        if plot_representation:
+        if plot_representation and DataBuilder is not None:
             self.plot_representation(dict_vectors=self.vectors,
-                                     most_relevant=most_relevant_data['selected_dataset'],
-                                     new_dataset_names=vectors_dataset_idx_tensors,
-                                     dataset_builder=DataBuilder,
-                                     new_vectors_=vectors_out_tensors, )
+                                    most_relevant=most_relevant_data['selected_dataset'],
+                                    new_dataset_names=vectors_dataset_idx_tensors,
+                                    dataset_builder=DataBuilder, 
+                                    new_vectors_=vectors_out_tensors,)
         if saved_sim_search:
             self.save_dict(dict_=most_relevant_data, filename=type_of_selection.lower())
         else:

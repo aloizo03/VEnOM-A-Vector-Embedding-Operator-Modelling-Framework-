@@ -12,6 +12,7 @@ import scipy
 import random 
 import operator as op
 import csv
+from utils_.selection_k import selection_k
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ class SR_Operator_Creation:
     def select_datasets(self):
         filenames_list = list(self.vectors.keys())
 
-        random_choice_datasets = np.random.choice(filenames_list, int(np.floor(len(filenames_list) * self.sr)))
+        random_choice_datasets = np.random.choice(filenames_list, selection_k(self.sr, len(filenames_list)))
         random_choice_datasets = list(random_choice_datasets)
         return random_choice_datasets
 
@@ -48,7 +49,7 @@ class SR_Operator_Creation:
         filenames_list = list(self.vectors.keys())
         random.shuffle(filenames_list)
 
-        random_choice_datasets = np.random.choice(filenames_list, int(np.floor(len(filenames_list) * self.sr)))
+        random_choice_datasets = np.random.choice(filenames_list, selection_k(self.sr, len(filenames_list)))
         random_choice_datasets = list(random_choice_datasets)
 
         selected_vectors = [self.vectors[dataset_] for dataset_ in random_choice_datasets]

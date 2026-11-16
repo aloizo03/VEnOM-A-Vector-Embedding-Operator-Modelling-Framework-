@@ -78,6 +78,53 @@ Adding the -dt graph as an argument implementing for graphs, and -dt image imple
 ### Pre-trained models for vectorisation
 On https://drive.google.com/drive/folders/1F6XF3p-sVwc8uyEtlDl806sODalb3rpj?usp=sharing, we are providing four models for vectorisation and must placed on results/ directory.
 
+### TabFM for tabular datasets
+
+Tabular datasets can alternatively be vectorised with Google's [TabFM](https://huggingface.co/google/tabfm-1.0.0-pytorch) foundation model (`pip install 'tabfm[pytorch]'`, weights are downloaded automatically from the Hugging Face hub, so no `-ckpt` is needed). TabFM has no official embedding API, so the per-row representations feeding its in-context predictor (8 CLS tokens x 256 dims = 2048) are mean-pooled per dataset and reduced to `--vector-size` k dimensions with a deterministic random projection:
+```
+$ python datasets_to_vec.py --tab-model tabfm -i "/data/dataset/" -out "/results/experiments" -vs 100 -s local
+$ python select_data.py --tab-model tabfm -i "/data/dataset_2/dataset.csv" -out "/results/experiments" -v $VEC_DIR -s "distance" -vs 100
+```
+The vectors can be stored locally (`-s local`) or in the Qdrant vector DB (`-s vectorDB`) exactly like the Num2Vec ones, and `select_data.py` must use the same `--tab-model` and `--vector-size` as the run that created the stored vectors. `--tabfm-task {classification,regression}` selects the backbone weights and `--tabfm-max-rows` caps how many rows per dataset are sampled as TabFM context (default 512).
+
+### Dataset2Vec for tabular datasets
+
+Tabular datasets can also be vectorised with the pretrained [Dataset2Vec](https://github.com/hadijomaa/dataset2vec) meta-feature model ("Dataset2Vec: Learning Dataset Meta-Features"). The repo is vendored under `dataset2vec/` together with its five pretrained checkpoint splits, so no `-ckpt` is needed (requires `tensorflow`). Each dataset is embedded by sampling batches of (instances x features x classes) subsets — treating the last CSV column as the target, quantile-binned when continuous — and averaging the resulting meta-features into one 32-d vector:
+```
+$ python datasets_to_vec.py --tab-model dataset2vec -i "/data/dataset/" -out "/results/experiments" -s local
+$ python select_data.py --tab-model dataset2vec -i "/data/dataset_2/dataset.csv" -out "/results/experiments" -v $VEC_DIR -s "distance"
+```
+`--d2v-split {0..4}` picks the pretrained checkpoint split (default 0) and `--d2v-batches` sets how many sampled batches are averaged per dataset (default 10). Vectors are always 32-d (the checkpoint's meta-feature width), regardless of `--vector-size`, unless a smaller size is requested.
+
+
+Step 3-Opeartor Modelling:
+Create labels:
+</br>
+```
+$ python train_exp.py -i "/data/dataset/" -out "/results/experiments" --query "last" --operator 'linear_regression'
+```
+
+```
+$ python3 operator_.py --dict-input sim_search.pickle -oi "/results/experiments/scores.csv" --out-path "/results/experiments" --operator 'linear_regression'
+```
+
+### Baseline: Apollo
+
+We use Apollo (Giannakopoulos et al.) as the baseline, run from its open-source implementation ([giagiannis/data-profiler](https://github.com/giagiannis/data-profiler), commit `<hash>`) without modification and with its default configuration, except for the sampling ratio, which we set to 0.1 and 0.2 (Apollo-SR 0.1 and Apollo-SR 0.2 in the paper).
+Instructions for running Apollo are provided by its authors as shell scripts in the [`_scripts/`](https://github.com/giagiannis/data-profiler/tree/master/_scripts) folder of their repository.
+
+### Hardware, configurations and timings
+
+Our framework runs on 4× NVIDIA A10 GPUs (24 GB each); Apollo runs on an AMD EPYC 7R32 CPU.
+
+| File | Content |
+|---|---|
+| `results/configurations.csv` | Qdrant, Apollo, framework and NumTabData2Vec settings, and hardware |
+| `results/hardware_timing/cost_per_operator.csv` | One-time cost (`T_once`), single-query end-to-end latency (`T_e2e`), operator cost (`T_op`), break-even number of queries (`N*`) and speedups (Appendix B, Table 12) |
+| `results/nns_exact_vs_qdrant/nns_exact_vs_qdrant.csv` | Recall@k and search latency of Qdrant against exact nearest-neighbour search (Appendix E, Table 16) |
+
+All times are in seconds, except search latency (ms per query).
+
 ### Run the UI 
 </br>
 

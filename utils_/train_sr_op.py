@@ -10,7 +10,8 @@ from utils_.utils import create_operator, create_ML_model, predict_dbscan, predi
 from torch.utils.data import DataLoader
 from models.torch_utils import select_device
 import csv
-from utils_.utils import calculate_cosine_similarity
+from utils_.utils import calculate_cosine_similarity, set_global_seed
+from utils_.selection_k import selection_k
 import os
 from server.server_utils.qdrant_controller import qdrant_controller
 
@@ -104,7 +105,7 @@ class Train_Operator:
         filenames_list = list(self.vectors.keys())
         random.shuffle(filenames_list)
 
-        random_choice_datasets = np.random.choice(filenames_list, int(np.floor(len(filenames_list) * self.sr)))
+        random_choice_datasets = np.random.choice(filenames_list, selection_k(self.sr, len(filenames_list)))
         random_choice_datasets = list(random_choice_datasets)
 
         selected_vectors = [self.vectors[dataset_] for dataset_ in random_choice_datasets]
@@ -162,7 +163,10 @@ class Train_Operator:
                 writer.writerow([r for r in record]) 
         logger.info('Writing the results into a csv file')
 
-    def train_operator(self, ML_model_name, query, op_name, scores_file=None, score_target_file=None, repititions=2):
+    def train_operator(self, ML_model_name, query, op_name, scores_file=None, score_target_file=None, repititions=2,
+                       seed=None):
+        if seed is not None:
+            set_global_seed(seed)
         logger.info(f'Experiments for operator {op_name}')
         start_time = time.time()
         pred_vectors, pred_dataset_idx = self.create_vectors_()
@@ -231,7 +235,7 @@ class Train_Operator:
         logger.info(f'Before the ml creation exec time: {exec_time}')
         for i in range(repititions):
             start_time = time.time()
-            ML_model = create_ML_model(X=X_train, y=y_train, name=ML_model_name)
+            ML_model = create_ML_model(X=X_train, y=y_train, name=ML_model_name, seed=seed)
 
             # for j in range(pred_vectors.shape[0]):
             if ML_model_name == 'perceptron':
@@ -271,5 +275,4 @@ class Train_Operator:
         self.save_csv_file(header=['Operator Name', 'Data Name', 'Acc', 'r^2', 'NRMSE', 'RMSE', 'MAE', 'MAD', 'MaPE', 'Exec time'],
                                             record=[op_name, f'Average All with Query: {query}', metrics_results_average['Acc'], '-', metrics_results_average['NRMSE'], metrics_results_average['RMSE'], metrics_results_average['MAE'], metrics_results_average['MAD'], metrics_results_average['MaPE'], metrics_results_average['r^2']],
                                             filename='results_out_sr.csv')
-
-
+        return metrics_results_average

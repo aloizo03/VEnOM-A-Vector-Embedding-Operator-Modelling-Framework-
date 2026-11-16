@@ -1,0 +1,18 @@
+component,parameter,value
+Qdrant,version,1.9.6
+Qdrant,distance,Euclidean
+Qdrant,index,HNSW (default; not built below indexing threshold)
+Qdrant,hnsw_m,16
+Qdrant,hnsw_ef_construct,100
+Qdrant,access,Qdrant_controller module
+Apollo,source,https://github.com/giagiannis/data-profiler
+Apollo,modifications,none (default configuration)
+Apollo,sampling_ratio,0.1 and 0.2
+Framework,selection_ratio_lambda,0.2
+Framework,k,"max(1, ceil(lambda * |D|))"
+Framework,re-embedding_threshold_th,0.10
+Framework,runs_per_experiment,10
+NumTabData2Vec,training,"100 epochs, Adam, lr 0.001, batch size 4, 10% validation (checkpoint selection)"
+Hardware,our framework,4x NVIDIA A10 (24 GB)
+Hardware,Apollo,AMD EPYC 7R32
+Random seed,value,0 (single seed for all experiments and runs)

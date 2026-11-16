@@ -1,0 +1,76 @@
+
+seeds: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+# Seeds that are hard-coded in the published code (used as-is for the paper):
+fixed_seeds:
+  kmeans_selection: 10                # utils_/select_datasets.py, KMeans(random_state=10)
+  kmeans_k_mins_threshold: 10         # k_mins_threshold.py, KMeans(random_state=10)
+  gaussian_random_projection: 42      # image vectors: utils_/vectors.py, utils_/select_datasets.py, utils_/dataset_update.py
+  mlp_classifier_label_helper: 1      # utils_/utils.py, MLPClassifier(random_state=1) for mlp_sgd / mlp_adam
+  tabfm_row_sampling_and_projection: 42   # models/tabfm_embedder.py
+  dataset2vec_sampling: 42            # models/dataset2vec_embedder.py (plus np.random.default_rng(0) at load)
+  unsupervised_experiment: [7, 42]    # experiments_ul.py (ShuffleSplit/KMeans 7, train_test_split 42)
+  drift_query_sample: 42              # dataset_drift_acc_ut.py, QUERY_SAMPLE_SEED
+
+# Not seeded in the published code:
+unseeded:
+  - surrogate models (MLPRegressor, SGDClassifier, LogisticRegression, SVC) - utils_/utils.py create_ML_model
+  - Num2Vec training (weight init, DataLoader shuffle, layer-freeze sampling) - models/trainer.py
+  - lake embedding dropout (lake vectors embedded once with dropout active, then stored in Qdrant) - utils_/vectors.py
+  - random selection baseline (np.random.choice) - utils_/select_datasets.py select_random
+  - repository sampling-ratio (SR) baseline sample - utils_/sr_operator.py, utils_/train_sr_op.py
+  - synthetic drift / noise generation - datasets_sim_drift_change_ot.py, data/pre_processing.py
+
+# Experiment protocol
+experiment:
+  driver: exec_all_data.py
+  selection_ratio_lambda: 0.2         # exec_all_data.py DATA_RATIO
+  repetitions: 10                     # exec_all_data.py OPERATOR_REPETITIONS (Dataset2Vec / TabFM: 2)
+  selection_methods: [cosine, distance, kmeans, vectordb]
+  outputs:
+    per_query_per_run: results/full_pipeline_eval/opmodel/<ds>_<op>_<dim>v_<method>/results.csv   # one row per query per repetition, in order; Exec time = surrogate train + predict per query
+    summary: results/full_pipeline_eval/opmodel/<ds>_<op>_<dim>v_<method>/results_summary.csv
+    selections: results/full_pipeline_eval/selection/<tag>/rel_data_<method>_<timestamp>.pickle
+    aggregate: results/full_pipeline_eval/full_pipeline_results.csv
+
+# Qdrant (server/server_utils/qdrant_controller.py)
+qdrant:
+  server: qdrant/qdrant 1.16.3 (build bd49f45a), Docker
+  # to reproduce: docker run -p 6333:6333 -p 6334:6334 -v "$(pwd)/qdrant_storage:/qdrant/storage:z" qdrant/qdrant:v1.16.3
+  client: qdrant-client (unpinned in requirements.txt)
+  url: http://localhost:6333
+  distance: Euclid
+  # Collections are created with VectorParams(size, distance) only, so all index
+  # parameters are the server defaults:
+  hnsw:
+    m: 16
+    ef_construct: 100
+    full_scan_threshold_kb: 10000
+  optimizers:
+    indexing_threshold_kb: 10000
+  quantization: null
+  search: query_points(limit=k) without search_params (hnsw_ef unset, exact unset)
+  # No collection reaches the indexing threshold (indexed_vectors_count = 0), so every
+  # search in the paper was an exact full scan (see NNS_BENCHMARK.md).
+
+# Apollo baseline
+apollo:
+  code: https://github.com/giagiannis/data-profiler   # not part of this repository
+  hardware: same machine as below, vCPUs and RAM only (no GPU)
+  # The repository's own sampling-ratio baseline (train_op_sr.py) is a separate,
+  # unseeded re-implementation; its scripts use these ratios:
+  repo_sr_baseline_sampling_ratios:
+    experiments_SR_scripts: [0.05, 0.1, 0.2, 0.4]                         # experiments_SR_*.sh, --sampling-ratio
+    create_files_scripts: [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4]    # create_files_*.sh, sr_create_operator.py -sr
+
+# Hardware and software (as reported by the authors)
+hardware:
+  platform: AWS EC2 virtual machine
+  cpu: 48 vCPUs, AMD EPYC 7R32 @ 2.40GHz
+  gpu: 4 x NVIDIA A10, 24 GB each
+  ram_gb: 192
+  storage_tb: 2
+  os: Ubuntu 24.04 LTS
+software:
+  python: 3.9.1
+  pytorch: 2.4.0

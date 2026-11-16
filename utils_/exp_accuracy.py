@@ -79,11 +79,21 @@ class EXP_Accuracy:
             dataset_names = DataBuilder.datasets_paths
             y = create_graph_operator(self.operator_name, graph_list=dataset_names)
             y_np = np.asarray(y, dtype=np.float64)
+            
+            n_bad = int(np.sum(~np.isfinite(y_np)))
+            if n_bad > 0:
+                logger.warning(
+                    f'Operator {self.operator_name}: replacing {n_bad} NaN/inf '
+                    f'value(s) with 0.0 before saving labels.'
+                )
+            y_np = np.nan_to_num(y_np, nan=0.0, posinf=0.0, neginf=0.0)
+
             if not return_labels:
                 self.save_predictions(y_np, dataset_names)
             else:
                 df = pd.DataFrame({'Dataset Name': dataset_names, 'Y': y_np})
                 return df
+            
         # elif self.operator_name.lower().startswith(("img", "image")): 
         #     dataset = Image_Pipeline_Dataset(data_path=self.input_path,
         #                                      return_label=True)
