@@ -18,7 +18,7 @@ Dependencies:
 14. `statsmodels=0.13.5`
 15. `tqdm=4.67.1`
 
-For a NumTabData2Vec model first you have to denote the dataset in "data/config.data.yaml", and the model configutation on "models/model.config.yaml"
+For a NumTabData2Vec model first you have to denote the dataset in "data/config.data.yaml", and the model configuration on "models/model.config.yaml"
 </br>
 </br>
 Model training:
@@ -50,14 +50,14 @@ Adding the -s vectordb as an argument you select to store the vector collection 
 
 Step 2-Similarity Search:
 </br>
-On similarity search we give as an input the same model we did for the vectorisation and the target dataset where we want to model an operator, the $VEC_DIR where is the vector results from vectorisationa and the similarity search technique.
+On similarity search we give as an input the same model we did for the vectorisation and the target dataset where we want to model an operator, the $VEC_DIR where is the vector results from vectorisation and the similarity search technique.
 ```
 $ python select_data.py -ckpt "results/model_training/weights/best.pt" -i "/data/dataset_2/dataset.csv" -out "/results/experiments" -v $VEC_DIR -s "k-means"
 ```
 Adding the -dt graph as an argument implementing for graphs, and -dt image implementing for images.
 
 
-Step 3-Opeartor Modelling:
+Step 3-Operator Modelling:
 Create labels:
 </br>
 ```
@@ -122,7 +122,7 @@ The configuration of every component (Qdrant, Apollo, framework parameters, NumT
  
 ### Baseline: Apollo
 
-We use Apollo (Giannakopoulos et al.) as the baseline, run from its open-source implementation ([giagiannis/data-profiler](https://github.com/giagiannis/data-profiler), commit `master`) without modification and with its default configuration, except for the sampling ratio, which we set to 0.1 and 0.2 (Apollo-SR 0.1 and Apollo-SR 0.2 in the paper).
+We use Apollo (Giannakopoulos et al.) as the baseline, run from its open-source implementation ([giagiannis/data-profiler](https://github.com/giagiannis/data-profiler), `master` branch as of <month year>) without modification and with its default configuration, except for the sampling ratio, which we set to 0.1 and 0.2 (Apollo-SR 0.1 and Apollo-SR 0.2 in the paper).
 Instructions for running Apollo are provided by its authors as shell scripts in the [`_scripts/`](https://github.com/giagiannis/data-profiler/tree/master/_scripts) folder of their repository.
 
 ### Hardware, configurations and timings
@@ -140,7 +140,7 @@ All times are in seconds, except search latency (ms per query).
 ### Run the UI 
 </br>
 
-To execute the UI you must build the database server from the sqlite3 shell by typping:
+To execute the UI you must build the database server from the sqlite3 shell by typing:
 ```
 .read server/server_utils/monitorDB_create_DB.sql
 ```
