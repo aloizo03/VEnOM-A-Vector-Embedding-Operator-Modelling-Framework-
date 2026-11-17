@@ -96,33 +96,22 @@ $ python select_data.py --tab-model dataset2vec -i "/data/dataset_2/dataset.csv"
 ```
 `--d2v-split {0..4}` picks the pretrained checkpoint split (default 0) and `--d2v-batches` sets how many sampled batches are averaged per dataset (default 10). Vectors are always 32-d (the checkpoint's meta-feature width), regardless of `--vector-size`, unless a smaller size is requested.
 
-
-Step 3-Opeartor Modelling:
-Create labels:
-</br>
-```
-$ python train_exp.py -i "/data/dataset/" -out "/results/experiments" --query "last" --operator 'linear_regression'
-```
-
-```
-$ python3 operator_.py --dict-input sim_search.pickle -oi "/results/experiments/scores.csv" --out-path "/results/experiments" --operator 'linear_regression'
-```
-
 ### Reproducibility
  
 All results in the paper use random seed `0`, which seeds `random`, `numpy`, `torch` (CPU and CUDA) and the `random_state` of the surrogate models (`utils_/utils.py::set_global_seed`). Each experiment is repeated 10 times and the reported values are the mean and standard deviation over these runs.
  
-One seed per run:** the 10 runs use the seeds 0–9 (one per run), which makes every run individually reproducible:
+The seed is set once at the start of each experiment and the 10 runs follow consecutively in the same process, so each run draws different random numbers and re-running the command reproduces all 10 runs:
+
 ```
-$ python operator_.py -i sim_search.pickle -oi scores.csv -out results/experiments -o linear_regression --seeds 0 1 2 3 4 5 6 7 8 9
-$ python train_op_sr.py ... --seeds 0 1 2 3 4 5 6 7 8 9      # random-sampling (SR) baseline
+$ python operator_.py -i sim_search.pickle -oi scores.csv -out results/experiments -o linear_regression -r 10
+$ python train_op_sr.py ... --seeds 0 # random-sampling (SR) baseline
 ```
  
 The configuration of every component (Qdrant, Apollo, framework parameters, NumTabData2Vec training, hardware, seed) is listed in `results/configurations.csv`.
  
 ### Baseline: Apollo
 
-We use Apollo (Giannakopoulos et al.) as the baseline, run from its open-source implementation ([giagiannis/data-profiler](https://github.com/giagiannis/data-profiler), `master` branch as of <month year>) without modification and with its default configuration, except for the sampling ratio, which we set to 0.1 and 0.2 (Apollo-SR 0.1 and Apollo-SR 0.2 in the paper).
+We use Apollo (Giannakopoulos et al.) as the baseline, run from its open-source implementation ([giagiannis/data-profiler](https://github.com/giagiannis/data-profiler), `master` branch as of 2018) without modification and with its default configuration, except for the sampling ratio, which we set to 0.1 and 0.2 (Apollo-SR 0.1 and Apollo-SR 0.2 in the paper).
 Instructions for running Apollo are provided by its authors as shell scripts in the [`_scripts/`](https://github.com/giagiannis/data-profiler/tree/master/_scripts) folder of their repository.
 
 ### Hardware, configurations and timings
