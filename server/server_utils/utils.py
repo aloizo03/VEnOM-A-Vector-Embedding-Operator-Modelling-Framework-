@@ -1,133 +1,156 @@
 from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
 import pickle
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from io import BytesIO
 import base64
 import numpy as np
 import matplotlib.colors as colors
-from PIL import Image
 import pandas as pd
-import os 
-import torch
+import os
 import sys
-import joblib
+import time
 
-sys.path.append('../')
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
 
-from models.vectorEmbedding import Num2Vec
-from data.Dataset import Pipeline_Dataset, graph_Pipeline_Dataset
-from torch.utils.data import DataLoader
+DATA_TYPES = {1: 'Tabular', 2: 'Graph', 3: 'Image'}
+
+TABFM_TASK = 'regression'
+
+OPERATORS = {
+    1: [('linear_regression', 'Linear Regression'),
+        ('mlp_regression', 'MLP Regression'),
+        ('svm_sgd', 'SVM (SGD)'),
+        ('svm', 'SVM'),
+        ('logistic_regression', 'Logistic Regression'),
+        ('mlp', 'MLP (Perceptron)')],
+    2: [('bc', 'Betweenness Centrality'),
+        ('ebc', 'Edge Betweenness Centrality'),
+        ('cc', 'Closeness Centrality'),
+        ('ec', 'Eigenvector Centrality'),
+        ('pr', 'PageRank'),
+        ('sr', 'Spectral Radius')],
+    3: [('svm_sgd', 'SVM (SGD)'),
+        ('svm', 'SVM'),
+        ('logistic_regression', 'Logistic Regression'),
+        ('mlp', 'MLP (Perceptron)'),
+        ('knn', 'K-Nearest Neighbours')],
+}
+
+SCHEMA = [
+    "CREATE TABLE IF NOT EXISTS Store_Vectors(store_id INTEGER PRIMARY KEY AUTOINCREMENT, store_name TEXT NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS Vector_Dimension(VEC_DIM INT PRIMARY KEY NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS Dataset_Vectors(id INTEGER PRIMARY KEY AUTOINCREMENT, vector_name TEXT NOT NULL, store_id INTEGER NOT NULL, data_type INT NOT NULL default 1, Dataset_id INT, embedder TEXT, model_path TEXT, vec_dim INT, FOREIGN KEY(store_id) REFERENCES Store_Vectors(store_id))",
+    "CREATE TABLE IF NOT EXISTS datasets(id INTEGER PRIMARY KEY AUTOINCREMENT, dataset_name TEXT NOT NULL UNIQUE, datapath TEXT NOT NULL, data_type INTEGER NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS Models_Table(id INT PRIMARY KEY NOT NULL, model_name TEXT NOT NULL, vec_dim INT NOT NULL, model_path TEXT NOT NULL, data_type INT NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS Operator_Modelling(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, output_path TEXT NOT NULL, sim_search_id INT NOT NULL, metrics TEXT NOT NULL, operator TEXT NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS Sim_Search(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, pred_datapath TEXT NOT NULL, stored_sim_search TEXT NOT NULL, vector_id INTEGER REFERENCES Dataset_Vectors(id))",
+    "CREATE TABLE IF NOT EXISTS tasks(task_id INTEGER PRIMARY KEY AUTOINCREMENT, task_number INTEGER UNIQUE NOT NULL, execution_time DOUBLE, is_complete INTEGER NOT NULL, description TEXT)",
+]
+
+
+def ensure_schema(conn):
+    for statement in SCHEMA:
+        conn.execute(statement)
+    columns = [row[1] for row in conn.execute("PRAGMA table_info(Dataset_Vectors)").fetchall()]
+    for column, col_type in (('embedder', 'TEXT'), ('model_path', 'TEXT'), ('vec_dim', 'INT')):
+        if column not in columns:
+            conn.execute(f"ALTER TABLE Dataset_Vectors ADD COLUMN {column} {col_type}")
+    if conn.execute("SELECT COUNT(*) FROM Store_Vectors").fetchone()[0] == 0:
+        conn.executemany("INSERT INTO Store_Vectors(store_id, store_name) VALUES(?, ?)", [(1, 'Local Store'), (2, 'Qdrant')])
+    conn.commit()
+
+
+def resolve_path(path):
+    if path is None or path == '':
+        return path
+    path = os.path.expanduser(str(path).strip())
+    if os.path.isabs(path):
+        return path
+    return os.path.join(REPO_ROOT, path)
 
 
 def check_dataset(filepath):
-    if os.path.isdir(filepath):
+    if os.path.exists(resolve_path(filepath)):
         print('dataset_exits')
         return True
     else:
         print('dataset does not exits')
         return False
-    
+
 def check_dataset_file(filepath):
-    if os.path.exists(filepath):
+    if os.path.exists(resolve_path(filepath)):
         print('dataset_exits')
         return True
     else:
         print('dataset does not exits')
         return False
 
-def create_model(model_path):
-    ckpt = torch.load(model_path)
 
-    model_info = ckpt['model_info']
-    input_dim = model_info['d_numerical']
-    d_out = model_info['d_out']
-    d_tokens = model_info['d_token']
-    num_layers = model_info['num_layers']
-    head_num = model_info['head_num']
-    attention_dropout = model_info['att_dropout']
-    ffn_dropout = model_info['ffn_dropout']
-    ffn_dim = model_info['ffn_dim']
-    activation = model_info['activation']
-    dim_k = model_info['dim_k']
-    table_input = model_info['ret_table']
-    
-    model = Num2Vec(d_numerical=input_dim,
-                    d_out=d_out,  # create a 3d representation
-                    n_layers=num_layers,
-                    d_token=d_tokens,
-                    head_num=head_num,
-                    attention_dropout=attention_dropout,
-                    ffn_dropout=ffn_dropout,
-                    ffn_dim=ffn_dim,
-                    activation=activation,
-                    train=False,
-                    input_table=table_input,
-                    d_k=dim_k)
-    
-    return model
+def get_embedding_models(conn):
+    models = {}
+    groups = {name: [] for name in DATA_TYPES.values()}
+    try:
+        rows = conn.execute("SELECT id, model_name, vec_dim, model_path, data_type FROM Models_Table ORDER BY data_type, vec_dim").fetchall()
+    except Exception as err:
+        print('Query Failed: %s' % str(err))
+        rows = []
+    for idx, model_name, vec_dim, model_path, data_type in rows:
+        if data_type not in (1, 2):
+            continue
+        embedder = 'graph2vec' if data_type == 2 else 'num2vec'
+        key = f'{embedder}:{idx}'
+        models[key] = {'data_type': data_type, 'embedder': embedder, 'model_path': model_path, 'vec_dim': vec_dim}
+        label = 'Num2Vec' if embedder == 'num2vec' else 'Graph2Vec'
+        groups[DATA_TYPES[data_type]].append((key, f'{label} {model_name} ({vec_dim}-d)'))
 
-def get_dataset_vector(model_path, data_path, data_type):
-    if data_type == 1:
-        ckpt = torch.load(model_path)
-        model_info = ckpt['model_info']
-        
-        model = create_model(model_path=model_path)
-        dataset_dataloader = Pipeline_Dataset(data_path=data_path,
-                                            norm=True,
-                                            ret_table=model_info['ret_table'],
-                                            k_dim=model_info['dim_k'])
-        
-        DataBuilder = dataset_dataloader.get_Dataloader()
-        dataloader = DataLoader(DataBuilder, batch_size=1, shuffle=False)
-        vectors_output = []
-        vectors_dataset_idx = []
-        with torch.no_grad():
-            for batch_idx, batch_ in enumerate(dataloader):
-                
-                features_, dataset_idx = batch_
-                features_ = features_.to(model.device)
-                
-                _, vectors, _ = model(features_)
-                
-                vectors_output.append(vectors.detach().cpu().numpy())
-                vectors_dataset_idx.append(dataset_idx.numpy())
-                
-        vectors_out_tensors = np.concatenate(vectors_output, axis=0)
-        vectors_dataset_idx_tensors = np.concatenate(vectors_dataset_idx, axis=0)
-    elif data_type == 2:
+    models['tabfm'] = {'data_type': 1, 'embedder': 'tabfm', 'model_path': None, 'vec_dim': None}
+    groups['Tabular'].append(('tabfm', 'TabFM (google/tabfm-1.0.0-pytorch)'))
+    models['dataset2vec'] = {'data_type': 1, 'embedder': 'dataset2vec', 'model_path': None, 'vec_dim': 32}
+    groups['Tabular'].append(('dataset2vec', 'Dataset2Vec (32-d)'))
 
-        model = joblib.load(model_path)
-        model.epochs = 1
-        dataset = graph_Pipeline_Dataset(data_path=data_path,
-                                         return_label=False)
-        DataBuilder = dataset.get_Dataloader()
-        data_graphs = DataBuilder.get_all_data()
-        vectors_out_tensors = model.infer(graphs=data_graphs)
-        vectors_dataset_idx_tensors = np.asarray(list(DataBuilder.idx_to_filename.keys()))
+    for vec_dim in get_all_vec_dimension(conn):
+        key = f'vit:{vec_dim}'
+        models[key] = {'data_type': 3, 'embedder': 'vit', 'model_path': None, 'vec_dim': vec_dim}
+        groups['Image'].append((key, f'ViT google/vit-base-patch16-224 ({vec_dim}-d)'))
+
+    choices = {group: options for group, options in groups.items() if options}
+    return models, choices
 
 
-    return convert_vectors_to_out_list(data_builder=DataBuilder, vectors=vectors_out_tensors,vectors_dataset_idx=vectors_dataset_idx_tensors)
+def get_operator_choices():
+    choices = {}
+    for data_type, operators in OPERATORS.items():
+        choices[DATA_TYPES[data_type]] = [(f'{data_type}:{code}', label) for code, label in operators]
+    return choices
 
-def convert_vectors_to_out_list(vectors, vectors_dataset_idx, data_builder):
-    out_data = {}
-    for vector, dataset_idx in zip(vectors, vectors_dataset_idx):
-        dataset_name = data_builder.get_dataset_name(dataset_idx)
-        out_data[dataset_name] = vector
-    return out_data
-    
-    
+
+def _project_3d(vec_np):
+    vec_np = np.asarray(vec_np, dtype=np.float64)
+    if vec_np.ndim == 1:
+        vec_np = vec_np.reshape(1, -1)
+    n_components = min(3, vec_np.shape[0], vec_np.shape[1])
+    if vec_np.shape[0] > 1:
+        result = PCA(n_components=n_components).fit_transform(vec_np)
+    else:
+        result = vec_np[:, :n_components]
+    if result.shape[1] < 3:
+        result = np.hstack([result, np.zeros((result.shape[0], 3 - result.shape[1]))])
+    return result
+
+
 def create_vec_repr_plot(vectors_):
     img = BytesIO()
     vec = list(vectors_.values())
-    vec_np = np.asarray(vec, dtype=np.float64)
     plt.set_loglevel('info')
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
-    pca = PCA(n_components=3)
-    result = pca.fit_transform(vec_np)
+    result = _project_3d(vec)
 
     ax.scatter(result[:, 0], result[:, 1], result[:, 2], c='blueviolet')
     ax.set(xlabel=(r' $x$'), ylabel=(r'$y$'), zlabel=(r'$z$'))
@@ -155,13 +178,12 @@ def create_sim_search_vector_plot(dict_vectors, sim_search_datasets):
     query_datasets = sim_search_datasets['Pred_Dataset']
     for data_name, query_vector in query_datasets.items():
         most_rel_names = most_relevant[data_name][0]
-        vec_np = np.array(list(dict_vectors.values()))
+        vec_np = np.array(list(dict_vectors.values()), dtype=np.float64)
 
         labels_ = ['Relevant Dataset' if i in most_rel_names else 'Data Lake' for i in dict_vectors.keys()]
 
-        vec_concat_np = np.concatenate((vec_np, [query_vector]), axis=0)
-        pca = PCA(n_components=3)
-        result = pca.fit_transform(vec_concat_np)
+        vec_concat_np = np.concatenate((vec_np, [np.asarray(query_vector, dtype=np.float64)]), axis=0)
+        result = _project_3d(vec_concat_np)
         unique = list(set(labels_))
         for i, u in enumerate(unique):
             vec_ = [result[j, :] for j in range(len(labels_)) if labels_[j] == u]
@@ -279,7 +301,7 @@ def get_avail_store_options(conn):
         print('Query Failed: %s\nError: %s' % (query, str(err)))
         return []
     
-def insert_vector_location(conn, filename, store_into, data_type, dataset_id):
+def insert_vector_location(conn, filename, store_into, data_type, dataset_id, embedder=None, model_path=None, vec_dim=None):
     query_1 = "SELECT * FROM STORE_VECTORS WHERE store_name=?"
     try:
         data_res = execute_query(conn=conn, query=query_1, values=(store_into,)).fetchall()
@@ -288,9 +310,9 @@ def insert_vector_location(conn, filename, store_into, data_type, dataset_id):
     results = [tuple(row) for row in data_res]
     store_id, _ = results[0]
 
-    query_2 = "INSERT INTO DATASET_VECTORS(vector_name, store_id, data_type, dataset_id) VALUES(?, ?, ?, ?)"
+    query_2 = "INSERT INTO DATASET_VECTORS(vector_name, store_id, data_type, dataset_id, embedder, model_path, vec_dim) VALUES(?, ?, ?, ?, ?, ?, ?)"
     try:
-        execute_query(conn=conn, query=query_2, values=(filename, store_id, data_type, dataset_id, ))
+        execute_query(conn=conn, query=query_2, values=(filename, store_id, data_type, dataset_id, embedder, model_path, vec_dim, ))
         conn.commit()
     except Exception as err:
         print('Query Failed: %s\nError: %s' % (query_2, str(err)))
@@ -319,6 +341,14 @@ def get_model_path_from_size(conn, vec_dim, data_type):
         return results[0][0]
     except Exception as err:
             print('Query Failed: %s\nError: %s' % (query, str(err)))
+
+def update_task_failed(conn, thread_id, error):
+    query = "UPDATE TASKS SET is_complete = ?, description = description || ? WHERE task_number = ?"
+    try:
+        execute_query(conn=conn, query=query, values=(-1, f' | Failed: {error}', thread_id,))
+        conn.commit()
+    except Exception as err:
+        print('Query Failed: %s\nError: %s' % (query, str(err)))
 
 def insert_task(conn, thread_id, description):
     query = "INSERT INTO TASKS(task_number, is_complete, description) VALUES(?,?,?)"
@@ -355,13 +385,21 @@ def get_all_vector_datasets(conn):
         data_res = execute_query(conn=cursor, query=query, values=None)
         data_res = cursor.fetchall()
         results = [list(tuple(row)) for row in data_res]
-        if len(results) <= 0:
-            return None
-        else:
-            return results    
+        return results
     except Exception as err:
         print('Query Failed: %s\nError: %s' % (query, str(err)))
-        
+        return []
+
+def get_vector_info(conn, vector_name):
+    query = "SELECT SV.store_name, DT.data_type, DT.embedder, DT.model_path, DT.vec_dim FROM DATASET_VECTORS DT JOIN STORE_VECTORS SV ON DT.store_id=SV.store_id WHERE DT.vector_name = ?"
+    row = conn.execute(query, (vector_name, )).fetchone()
+    if row is None:
+        return None
+    store_name, data_type, embedder, model_path, vec_dim = tuple(row)
+    if embedder is None:
+        embedder = {1: 'num2vec', 2: 'graph2vec', 3: 'vit'}.get(data_type)
+    return {'store': store_name, 'data_type': data_type, 'embedder': embedder, 'model_path': model_path, 'vec_dim': vec_dim}
+
 def find_database_store(conn, vector_name):
     query = "SELECT SV.store_name, DT.data_type FROM DATASET_VECTORS DT JOIN STORE_VECTORS SV ON DT.store_id=SV.store_id WHERE DT.vector_name =?"
     try:

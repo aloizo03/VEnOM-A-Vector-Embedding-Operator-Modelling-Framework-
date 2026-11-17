@@ -23,7 +23,7 @@ INSERT INTO Vector_Dimension (VEC_DIM) VALUES (128);
 
 -- Table: Dataset_Vectors
 DROP TABLE IF EXISTS Dataset_Vectors;
-CREATE TABLE IF NOT EXISTS Dataset_Vectors(id INTEGER PRIMARY KEY AUTOINCREMENT, vector_name TEXT NOT NULL, store_id INTEGER NOT NULL, data_type INT NOT NULL default 1, Dataset_id INT, FOREIGN KEY(store_id) REFERENCES Store_Vectors(store_id));
+CREATE TABLE IF NOT EXISTS Dataset_Vectors(id INTEGER PRIMARY KEY AUTOINCREMENT, vector_name TEXT NOT NULL, store_id INTEGER NOT NULL, data_type INT NOT NULL default 1, Dataset_id INT, embedder TEXT, model_path TEXT, vec_dim INT, FOREIGN KEY(store_id) REFERENCES Store_Vectors(store_id));
 
 -- Table: datasets
 DROP TABLE IF EXISTS datasets;

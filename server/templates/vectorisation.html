@@ -60,8 +60,9 @@
       {{form.select_dataset(class="form-select form-select-lg mb-3")}}
       <br/>
       <br/>
-      {{form.select_vec_size.label}}
-      {{form.select_vec_size(class="form-select form-select-lg mb-3")}}
+      {{form.select_model.label}}
+      {{form.select_model(class="form-select form-select-lg mb-3")}}
+      <p class="help-block">Tabular: Num2Vec, TabFM or Dataset2Vec. Graphs: Graph2Vec. Images: ViT, projected to the chosen size.</p>
       <br/>
       <br/>
       {{form.save_into.label}}

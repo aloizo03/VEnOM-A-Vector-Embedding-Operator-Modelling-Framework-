@@ -140,9 +140,9 @@ All times are in seconds, except search latency (ms per query).
 ### Run the UI 
 </br>
 
-To execute the UI you must build the database server from the sqlite3 shell by typing:
+The UI uses the SQLite database `server/server_utils/vector_OM.db`. Missing tables are created when the server starts; to rebuild the database from scratch, run in the sqlite3 shell:
 ```
-.read server/server_utils/monitorDB_create_DB.sql
+.read server/server_utils/monitorDB_create_DB
 ```
 </br>
 
@@ -151,7 +151,17 @@ Run the server:
 python server/main.py
 ```
 
-All paths default to locations inside the repository and can be overridden with environment variables: `VENOM_DB_FILE` (default `server/server_utils/vector_OM.db`), `VENOM_LOCAL_STORE` (`server/tmp_locally_store`), `VENOM_SIM_SEARCH_STORE` (`server/sim_search_store`), `VENOM_SCORES_DIR` (`server/tmp_score_labels/`), `VENOM_OPERATORS_DIR` (`server/tmp_operators/`), `VENOM_VECTORS_FILE` (`Results_Experiments_2/HPC_2K/200V/vectors_1731669493.3926575.pickle`), `VENOM_SIM_SEARCH_FILE` (`Results_Experiments_2/HPC_2K/200V/Dataset_Selection/rel_data_cosine_1733225609.908662.pickle`), `VENOM_GRAPH_DATA_ROOT` (`data`, used by `data/pre_process_graph_data.py`) and `VENOM_RESULTS_ROOT` (`results/`, resolved against the working directory and used by `utils_/create_operator.py` and `nns_recall_benchmark.py`).
+The UI supports the same modalities and embedding models as the command line:
+
+| Modality | Embedding models | Operators |
+|---|---|---|
+| Tabular | Num2Vec (checkpoints listed in `Models_Table`), TabFM, Dataset2Vec | Linear Regression, MLP Regression, SVM (SGD), SVM, Logistic Regression, MLP |
+| Graph | Graph2Vec (checkpoints listed in `Models_Table` with `data_type = 2`) | Betweenness, Edge Betweenness, Closeness and Eigenvector Centrality, PageRank, Spectral Radius |
+| Image | ViT `google/vit-base-patch16-224`, projected to a size from `Vector_Dimension` | SVM (SGD), SVM, Logistic Regression, MLP, KNN |
+
+Each set of vectors records the model that created it, and the similarity search embeds the query datasets with that same model. Relative dataset and model paths are resolved against the repository root. For graph and image operators the target labels of the query datasets are created automatically, unless a labels CSV is given.
+
+All paths default to locations inside the repository and can be overridden with environment variables: `VENOM_DB_FILE` (default `server/server_utils/vector_OM.db`), `VENOM_LOCAL_STORE` (`server/tmp_locally_store`), `VENOM_SIM_SEARCH_STORE` (`server/sim_search_store`), `VENOM_SCORES_DIR` (`server/tmp_score_labels/`), `VENOM_OPERATORS_DIR` (`server/tmp_operators/`), `VENOM_SECRET_KEY` (Flask session key), `VENOM_GRAPH_DATA_ROOT` (`data`, used by `data/pre_process_graph_data.py`) and `VENOM_RESULTS_ROOT` (`results/`, resolved against the working directory and used by `utils_/create_operator.py` and `nns_recall_benchmark.py`).
 
 </br>
 

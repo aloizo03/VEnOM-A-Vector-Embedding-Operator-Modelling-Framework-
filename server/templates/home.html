@@ -29,6 +29,16 @@
         </div>
     </div>
 
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <div class="container">
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }}" role="alert">{{ message }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% endwith %}
+
     {% if(page_name == "load_data") %} 
       {% include 'load_data.html' %}
     {%elif page_name == "vectorisation"%}

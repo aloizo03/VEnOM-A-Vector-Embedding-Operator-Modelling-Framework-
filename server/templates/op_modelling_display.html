@@ -13,11 +13,12 @@
     <div class="container" id="display_graph">    
       <h2>Operator Modelling Prediction Results</h2>
       <br/>
-      {{desc_p|safe}}
+      {{desc_p}}
       <br/>
       <table class="table" align="center" style="margin: 0px auto;">
         <thead class="thead-dark">
             </tr>
+                <th scope="col">R²</th>
                 <th scope="col">RMSE</th>
                 <th scope="col">MAE</th>
                 <th scope="col">MAD</th>
@@ -29,6 +30,7 @@
             <tbody>
                 <tr>
                 </tbody>
+                    <td>{{row_tuple.r2(class="form-control", disabled=True)}} </td>
                     <td>{{row_tuple.rmse(class="form-control", disabled=True)}} </td>
                     <td>{{row_tuple.mae(class="form-control", disabled=True)}}</td>
                     <td>{{row_tuple.mad(class="form-control", disabled=True)}} </td>

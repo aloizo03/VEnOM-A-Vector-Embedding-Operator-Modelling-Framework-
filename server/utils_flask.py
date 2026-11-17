@@ -1,7 +1,7 @@
 from flask_wtf import FlaskForm
 from flask_wtf.form import _Auto
 from wtforms import StringField, SubmitField, SelectField, RadioField, FieldList, FormField, TextAreaField, DecimalField
-from wtforms.validators import DataRequired, NumberRange
+from wtforms.validators import DataRequired, NumberRange, Optional
 
 class DatasetsForm(FlaskForm):
     dataset_name_text = StringField("Dataset Name")
@@ -24,6 +24,7 @@ class updatedTaskForm(FlaskForm):
     field_list = FieldList(FormField(TaskForm), min_entries=0)
 
 class Task_Op_Model_Display(FlaskForm):
+    r2 = StringField("r2")
     rmse = StringField("rmse")
     mae = StringField("mae")
     mad = StringField("mad")
@@ -35,26 +36,26 @@ class updatedOpModelForm(FlaskForm):
 
 
 class LoadDataForm(FlaskForm):
-    Dataset_type = RadioField('Select Dataset Data Type', choices=[('1', 'Tabular Dataset'), ('2', 'Graphs ')], coerce=int)
+    Dataset_type = RadioField('Select Dataset Data Type', choices=[('1', 'Tabular Dataset'), ('2', 'Graphs'), ('3', 'Images')], coerce=int, default=1)
     Dataset_DIR = StringField("Dataset Filepath", validators=[DataRequired()])
     Dataset_Name = StringField("Dataset Name", validators=[DataRequired()])
     submit = SubmitField("Submit")
 
     def __init__(self):
         super().__init__()
-        self.dataset_type_dict = {'1': 'Tabular Dataset', '2':  'Graphs '}
+        self.dataset_type_dict = {'1': 'Tabular Dataset', '2': 'Graphs', '3': 'Images'}
 
 
 class VectorisationForm(FlaskForm):
     select_dataset = SelectField('Select Dataset', choices=[], coerce=int)
-    select_vec_size = SelectField('Select Vector Size', choices=[], coerce=int)
+    select_model = SelectField('Select Embedding Model', choices=[], coerce=str)
     save_into = SelectField('Save Vectors', choices=[], coerce=int)
     submit = SubmitField("Create Vectorization")
-    
-    def __init__(self, vector_sizes=None, avail_datasets=None, save_dbs=None):
+
+    def __init__(self, embedding_models=None, avail_datasets=None, save_dbs=None):
         super().__init__()
-        if vector_sizes:
-            self.select_vec_size.choices = [(id, vect) for id, vect in vector_sizes.items()]
+        if embedding_models:
+            self.select_model.choices = embedding_models
         if avail_datasets:
             self.select_dataset.choices = [(id, data_name) for id, data_name in avail_datasets.items()]
         if save_dbs:
@@ -63,7 +64,7 @@ class VectorisationForm(FlaskForm):
 class DisplayVectorEmbeddingRepr(FlaskForm):
     select_ver = SelectField('Vector Embedding Representation', choices=[], coerce=int)
     submit = SubmitField("Display")
-    
+
     def __init__(self, vec_emb_reprs=None):
         super().__init__()
         if vec_emb_reprs:
@@ -75,7 +76,7 @@ class SimilaritySearchForm(FlaskForm):
     pred_data_dir_path = StringField("Prediction Datasets Directory Path", validators=[DataRequired()],  render_kw={'style': 'width: 50ch'})
     select_sim_search = RadioField('Select Similarity Search', choices=[], coerce=int)
     select_dataset = DecimalField('λ Dataset Selection Range (0, 1)', validators=[NumberRange(min=0.1, max=1.0, message='bla')])
-    
+
     select_avail_vec_repr = SelectField('Select Available Vector Representation', choices=[], coerce=int)
     submit = SubmitField("Submit")
 
@@ -87,14 +88,15 @@ class SimilaritySearchForm(FlaskForm):
 class OperatorModellingForm(FlaskForm):
     operator_name = StringField("Name", validators=[DataRequired()])
     operator_dir = StringField("Output Directory Path", validators=[DataRequired()])
-    select_avail_oper = SelectField('Select Operator', choices=[], coerce=int)
+    select_avail_oper = SelectField('Select Operator', choices=[], coerce=str)
     select_avail_vec_repr = SelectField('Select Similarity Search', choices=[], coerce=int)
+    target_labels = StringField("Target Labels CSV (optional, created automatically for graphs and images)", validators=[Optional()])
 
     submit = SubmitField("Operator Modelling")
 
     def __init__(self, vectors=None, operator_algorithms=None):
         super().__init__()
-        self.select_avail_oper.choices = [(id, op_alg) for id, op_alg in operator_algorithms.items()]
+        self.select_avail_oper.choices = operator_algorithms
         self.select_avail_vec_repr.choices = [(id, vec) for id, vec in vectors.items()]
 
 class OperatorModellingDisplayForm(FlaskForm):
@@ -104,4 +106,3 @@ class OperatorModellingDisplayForm(FlaskForm):
     def __init__(self, avail_op_models_select=None):
         super().__init__()
         self.avail_op_models.choices = [(id, op_alg) for id, op_alg in avail_op_models_select.items()]
-
