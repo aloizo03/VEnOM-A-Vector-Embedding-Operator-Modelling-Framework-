@@ -1,4 +1,5 @@
 from utils_.create_operator import Create_Operator
+from utils_.utils import set_global_seed
 import argparse
 
 
@@ -18,8 +19,11 @@ def main():
     parser.add_argument("--seeds", type=int, nargs="+", default=None,
                         help='One repetition per seed (overrides --repetitions), e.g. --seeds 0 1 2 3 4 5 6 7 8 9. '
                              'Seeds numpy/random/torch and the surrogate random_state; per-row results get a Seed column.')
+    parser.add_argument("--seed", type=int, default=0,
+                        help='Global random seed (numpy/random/torch), set once before the experiment starts')
 
     args = parser.parse_args()
+    set_global_seed(args.seed)
 
     data_input_dict_path = args.dict_input
     input_operator_dir = args.operator_input

@@ -1,5 +1,6 @@
 import argparse
 from utils_.train_sr_op import Train_Operator
+from utils_.utils import set_global_seed
 import sys
 from server.server_utils.qdrant_controller import qdrant_controller
 
@@ -23,8 +24,11 @@ def main():
                         help='One independent run per seed (fresh seeded lake sample + seeded surrogate, '
                              'repititions=1 each); per-run metrics are appended to <out>/results_sr_runs.csv')
     parser.add_argument('-sDB', '--show-DBs', action="store_true", help="Show all the available vector Dabase colections with their description")
+    parser.add_argument("--seed", type=int, default=0,
+                        help='Global random seed (numpy/random/torch), set once before the experiments start')
 
     args = parser.parse_args()
+    set_global_seed(args.seed)
     show_Vec_DB_collections = args.show_DBs
     if show_Vec_DB_collections:
         qdrant_ctrl = qdrant_controller()
