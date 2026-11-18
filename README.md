@@ -111,7 +111,7 @@ The configuration of every component (Qdrant, Apollo, framework parameters, NumT
  
 ### Baseline: Apollo
 
-We use Apollo (Giannakopoulos et al.) as the baseline, run from its open-source implementation ([giagiannis/data-profiler](https://github.com/giagiannis/data-profiler), `master` branch as of 2018) without modification and with its default configuration, except for the sampling ratio, which we set to 0.1 and 0.2 (Apollo-SR 0.1 and Apollo-SR 0.2 in the paper).
+We use Apollo (Giannakopoulos et al.) as the baseline, run from its open-source implementation ([giagiannis/data-profiler](https://github.com/giagiannis/data-profiler), commit [`a643276`](https://github.com/giagiannis/data-profiler/commit/a64327652e682380fa05452314856382a08edc5e)) without modification and with its default configuration, except for the sampling ratio, which we set to 0.1 and 0.2 (Apollo-SR 0.1 and Apollo-SR 0.2 in the paper).
 Instructions for running Apollo are provided by its authors as shell scripts in the [`_scripts/`](https://github.com/giagiannis/data-profiler/tree/master/_scripts) folder of their repository.
 
 ### Hardware, configurations and timings
