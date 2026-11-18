@@ -98,17 +98,15 @@ $ python select_data.py --tab-model dataset2vec -i "/data/dataset_2/dataset.csv"
 
 ### Reproducibility
 
-All results in the paper use random seed `0`, which seeds `random`, `numpy`, `torch` (CPU and CUDA) and the `random_state` of the surrogate models (`utils_/utils.py::set_global_seed`). Each experiment is repeated 10 times, and the reported values are the mean and standard deviation over these runs.
-
-The seed is set once, at the start of each experiment, and the 10 runs then follow consecutively in the same process. Each run therefore draws different random numbers (dataset sampling and surrogate initialisation), and re-running the command reproduces all 10 runs:
+Each experiment is repeated 10 times with random seeds 0–9, one per run (run 1 uses seed 0, …, run 10 uses seed 9). Each seed is applied at the start of its run to `random`, `numpy`, `torch` (CPU and CUDA) and the `random_state` of the surrogate models (`utils_/utils.py::set_global_seed`), so every run is individually reproducible. The reported values are the mean and standard deviation over the 10 runs.
 
 ```
-$ python operator_.py -i sim_search.pickle -oi scores.csv -out results/experiments -o linear_regression -r 10 --seed 0
-$ python train_op_sr.py ... -r 10 --seed 0      # random-sampling (SR) baseline
+$ python operator_.py -i sim_search.pickle -oi scores.csv -out results/experiments -o linear_regression --seeds 0 1 2 3 4 5 6 7 8 9
+$ python train_op_sr.py ... --seeds 0 1 2 3 4 5 6 7 8 9      # random-sampling (SR) baseline
 ```
 
-The configuration of every component (Qdrant, Apollo, framework parameters, NumTabData2Vec training, hardware and seed) is listed in `results/configurations.csv`.
- 
+The configuration of every component (Qdrant, Apollo, framework parameters, NumTabData2Vec training, hardware and seeds) is listed in `results/configurations.csv`.
+
 ### Baseline: Apollo
 
 We use Apollo (Giannakopoulos et al.) as the baseline, run from its open-source implementation ([giagiannis/data-profiler](https://github.com/giagiannis/data-profiler), commit [`a643276`](https://github.com/giagiannis/data-profiler/commit/a64327652e682380fa05452314856382a08edc5e)) without modification and with its default configuration, except for the sampling ratio, which we set to 0.1 and 0.2 (Apollo-SR 0.1 and Apollo-SR 0.2 in the paper).

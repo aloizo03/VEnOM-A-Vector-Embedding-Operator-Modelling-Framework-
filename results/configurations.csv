@@ -15,4 +15,4 @@ Framework,runs_per_experiment,10
 NumTabData2Vec,training,"100 epochs, Adam, lr 0.001, batch size 4, 10% validation (checkpoint selection)"
 Hardware,our framework,4x NVIDIA A10 (24 GB)
 Hardware,Apollo,AMD EPYC 7R32
-Random seed,value,0 (single seed for all experiments and runs)
+Random seed,value,"0-9 (one seed per run; run 1 uses seed 0, ..., run 10 uses seed 9)"
