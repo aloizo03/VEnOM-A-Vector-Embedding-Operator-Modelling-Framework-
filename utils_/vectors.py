@@ -1,7 +1,7 @@
 import torch
 from data.Dataset import Pipeline_Dataset, graph_Pipeline_Dataset, Image_Pipeline_Dataset
 from models.vectorEmbedding import Num2Vec
-from models.tabfm_embedder import TabFMEmbedder, project_vectors
+from models.tabfm_embedder import TabFMEmbedder
 from models.dataset2vec_embedder import Dataset2VecEmbedder
 from models.torch_utils import select_device
 import joblib
@@ -55,6 +55,7 @@ class Vectorise:
             self.embedder = TabFMEmbedder(model_type=tabfm_task,
                                           checkpoint_path=model_path,
                                           max_rows=tabfm_max_rows)
+
             self.dataset = Pipeline_Dataset(data_path=data_path, norm=False)
             self.vector_dim = d_token
         elif self.data_type == 1 and self.tab_model == 'dataset2vec':
@@ -252,7 +253,6 @@ class Vectorise:
             vectors_out_np = np.vstack(raw_vectors)
             # reduce the raw embedder vectors to the requested k dimensions
             # (no-op when they are already smaller, e.g. dataset2vec's 32 dims)
-            # vectors_out_np = project_vectors(vectors_out_np, self.vector_dim)
             self.vector_dim = vectors_out_np.shape[1]
             vectors_dataset_idx_np = np.asarray(dataset_idxs)
         elif self.data_type == 1:

@@ -1,4 +1,4 @@
-num_layers : 10
+num_layers : 8
 input_dim: 30
 d_token: 256
 head_num: 8

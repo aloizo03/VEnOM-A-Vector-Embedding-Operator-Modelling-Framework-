@@ -4,8 +4,6 @@ import numpy as np
 import pandas as pd
 import torch
 
-from sklearn.random_projection import GaussianRandomProjection
-
 TABFM_HF_REPO = "google/tabfm-1.0.0-pytorch"
 
 class TabFMEmbedder:

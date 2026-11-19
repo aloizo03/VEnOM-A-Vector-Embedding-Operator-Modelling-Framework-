@@ -82,8 +82,8 @@ On https://drive.google.com/drive/folders/1F6XF3p-sVwc8uyEtlDl806sODalb3rpj?usp=
 
 Tabular datasets can alternatively be vectorised with Google's [TabFM](https://huggingface.co/google/tabfm-1.0.0-pytorch) foundation model (`pip install 'tabfm[pytorch]'`, weights are downloaded automatically from the Hugging Face hub, so no `-ckpt` is needed). TabFM has no official embedding API, so the per-row representations feeding its in-context predictor (8 CLS tokens x 256 dims = 2048) are mean-pooled per dataset and reduced to `--vector-size` k dimensions with a deterministic random projection:
 ```
-$ python datasets_to_vec.py --tab-model tabfm -i "/data/dataset/" -out "/results/experiments" -vs 100 -s local
-$ python select_data.py --tab-model tabfm -i "/data/dataset_2/dataset.csv" -out "/results/experiments" -v $VEC_DIR -s "distance" -vs 100
+$ python datasets_to_vec.py --tab-model tabfm -i "/data/dataset/" -out "/results/experiments" -s local
+$ python select_data.py --tab-model tabfm -i "/data/dataset_2/dataset.csv" -out "/results/experiments" -v $VEC_DIR -s "distance"
 ```
 The vectors can be stored locally (`-s local`) or in the Qdrant vector DB (`-s vectorDB`) exactly like the Num2Vec ones, and `select_data.py` must use the same `--tab-model` and `--vector-size` as the run that created the stored vectors. `--tabfm-task {classification,regression}` selects the backbone weights and `--tabfm-max-rows` caps how many rows per dataset are sampled as TabFM context (default 512).
 

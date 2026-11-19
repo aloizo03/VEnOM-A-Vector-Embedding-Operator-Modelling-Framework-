@@ -15,7 +15,7 @@ def main():
                         help='Output path for the saving of the embeddings')
     parser.add_argument('-v', '--vectors', type=str, help='vectors path or VectorDB collection name')
     parser.add_argument('-s', '--data-selection', type=str, default='distance', help='Type of data selection (sim, distance, random)')
-    parser.add_argument('-r', '--data-ratio', type=float, default=0.3, help='Percentage of who many datasets will be selectes which are relevant to data input .csv file')
+    parser.add_argument('-r', '--data-ratio', type=float, default=0.2, help='Percentage of who many datasets will be selectes which are relevant to data input .csv file')
     parser.add_argument("-dt", "--data-type", type=str, default='tabular', help='Available Data Type:\n\t-tabular: For tabular Dataset\n\t-graph: For Graph Dataset\n\t-Image: For Image Dataset')
     parser.add_argument("-vb", "--vector-db", action="store_true", help="Use the vector from the vector database")
     parser.add_argument('-vs', '--vector-size', type=int, default=100, help='The vector embedding token dimension')

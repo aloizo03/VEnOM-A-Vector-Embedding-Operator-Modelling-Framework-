@@ -529,7 +529,7 @@ class Data_selection:
             most_relevant_data = self.select_random(vect_dict=self.vectors, vectors=datasets_dict, ratio=data_ratio_selection)
             type_of_selection = f'random_{data_ratio_selection}'
         elif type_of_selection.lower() == 'k-means':
-            max_s = 0.5
+            max_s = 0.25
             if data_ratio_selection > max_s:
                 max_s = data_ratio_selection + 0.1
             most_relevant_data = self.compute_KMeans_cluster(vect_dict=self.vectors, vectors=datasets_dict, min_s=data_ratio_selection, max_s=max_s)

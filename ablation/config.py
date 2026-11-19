@@ -36,7 +36,6 @@ MAX_HOURS_PER_MODEL = None
 EMBED_MODES = ["paper"]
 
 VARIANTS = {
-    "vae":               dict(cls="Num2Vec", objective="vae", beta=1.0, group="objective,backbone,beta"),
     "ae":                dict(cls="Num2VecAE", objective="ae", group="objective,backbone"),
     "siamese":           dict(cls="Num2VecSiamese", objective="siamese", group="objective"),
     "mlp_vae":           dict(cls="MLPEncoderVAE", objective="vae", beta=1.0, group="objective,backbone"),
