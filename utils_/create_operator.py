@@ -84,7 +84,7 @@ def _sanitize_train(X_train, y_train, dataset_name="unknown"):
         x_arr = x_arr[mask]
     elif x_arr.ndim == 1 and x_arr.shape[0] == len(mask):
         x_arr = x_arr[mask]
-    return x_arr, y_arrs
+    return x_arr, y_arr
 
 class Create_Operator:
 

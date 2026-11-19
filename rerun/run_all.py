@@ -321,7 +321,6 @@ def stage_verify(R, datasets):
     from qdrant_client import models
     sys.path.insert(0, REPO)
     from utils_.selection_k import selection_k
-    from utils_.path_remap import remap_path
 
     rows, ok_all = [], True
     for ds, op in C.VERIFY:
@@ -351,7 +350,7 @@ def stage_verify(R, datasets):
         for q, qv in dist["Pred_Dataset"].items():
             pts = c.query_points(coll, query=np.asarray(qv, dtype=float).tolist(), limit=k, with_vectors=True,
                                  with_payload=True, search_params=models.SearchParams(exact=True)).points
-            en = [remap_path(p.payload["dataset_name"]) for p in pts]
+            en = [p.payload["dataset_name"] for p in pts]
             ev = [p.vector for p in pts]
             exact["selected_dataset"][q] = [en, ev]
             hn, hv = dist["selected_dataset"][q]
@@ -490,7 +489,7 @@ def main():
             {"grid": stage_grid, "lambda": stage_lambda, "sr": stage_sr, "embedders": stage_embedders}[st](R, order)
         R.log_time(st, "stage", time.time() - t0, "done")
     R.log_time("all", "total", time.time() - t_all, "done")
-    print(f"\nFinished. Results in {R.out}. Run `python rerun/run_all.py --pack` and send the tar.gz back.")
+    print(f"\nFinished. Results in {R.out}. Run `python rerun/run_all.py --pack` to archive them.")
 
 
 if __name__ == "__main__":
