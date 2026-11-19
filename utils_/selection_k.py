@@ -4,9 +4,10 @@ import numpy as np
 def selection_k(ratio, n, rounding='ceil'):
     """Number of lake datasets to select for a selection ratio lambda.
 
-    Single definition used by every selection path (Qdrant, Euclidean, cosine,
-    K-Means bounds, random/SR) so all methods select the same k:
-        k = max(1, ceil(lambda * N)), capped at N.
+    As in the paper (Appendix E), the Vector DB (Qdrant) search selects
+    k = ceil(lambda * N), whereas the hand-written similarity functions
+    (cosine and Euclidean distance) select k = floor(lambda * N).
+    k is always at least 1 and at most N.
     `ratio` may be given as a fraction (0.2) or a percentage (20).
     """
     if ratio > 1:
