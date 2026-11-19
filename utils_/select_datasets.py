@@ -1,6 +1,6 @@
 import torch
 from models.vectorEmbedding import Num2Vec
-from models.tabfm_embedder import TabFMEmbedder, project_vectors
+from models.tabfm_embedder import TabFMEmbedder
 from models.dataset2vec_embedder import Dataset2VecEmbedder
 from data.Dataset import Pipeline_Dataset, graph_Pipeline_Dataset, Image_Pipeline_Dataset
 import hashlib

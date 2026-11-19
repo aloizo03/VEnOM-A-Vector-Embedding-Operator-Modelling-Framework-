@@ -1,20 +1,19 @@
 import os
 
-ROOT = os.environ.get("VE_ROOT", "/various/aloizou")   # override only for local testing
+ROOT = os.environ.get("VE_ROOT", "/various/aloizou")   
 REPO = f"{ROOT}/Projects/Projects_updated/Vector_Embedding"
 DATA = f"{ROOT}/Results"
-# Lake dataset names stored in the March collections use the old data root; the files
-# now live under DATA. Applied only when the stored path is missing and the new one exists.
+
 PATH_REMAP = {f"{ROOT}/Results/Results/": f"{DATA}/"}
 
-QDRANT_URL = os.environ.get("VE_QDRANT_URL", "http://localhost:6333")    # qdrant_controller.py is hard-wired to this URL
+QDRANT_URL = os.environ.get("VE_QDRANT_URL", "http://localhost:6333")
 
 SEEDS = list(range(10))
-LAMBDA = 0.2                             # main tables
-LAMBDA_SWEEP = [0.05, 0.1, 0.2, 0.3]     # Figure 12 (results/*/sim_search/th_*)
-SR_RATIOS = [0.05, 0.1, 0.2, 0.4]        # Apollo-style SR baseline (experiments_SR_*.sh)
-SR_MODEL = "perceptron_regression"       # surrogate used by every experiments_SR_*.sh run
-METHODS = {                              # name -> select_data.py -s flag (all with -vb)
+LAMBDA = 0.2
+LAMBDA_SWEEP = [0.05, 0.1, 0.2, 0.3]
+SR_RATIOS = [0.05, 0.1, 0.2, 0.4]
+SR_MODEL = "perceptron_regression"
+METHODS = {
     "cosine": "cosine",
     "distance": "distance",
     "kmeans": "k-means",
@@ -50,8 +49,6 @@ DATASETS = {
     },
     "stock": {
         "type": "tabular", "operators": ["linear_regression", "mlp_regression"],
-        # CHECK: the Stock lake could be data/Stock/test (649 files) or test_ (508); only
-        # used if the collection below is missing and has to be rebuilt
         "lake": f"{DATA}/data/Stock/test", "queries": f"{DATA}/data/Stock/test_2",
         "main_dim": 300,
         "collections": {300: "vectors_STOCKS_VS300_1773662729.3367891_300",
@@ -101,9 +98,6 @@ DATASETS = {
     },
 }
 
-# Verification gate (run first): Qdrant exact vs fixed hand-written Euclidean.
 VERIFY = [("hpc", "linear_regression"), ("adult", "mlp_regression")]
 
-# Graph/image lake labels are reused from the original run when present (keeps the
-# targets identical to the old numbers); otherwise train_exp.py regenerates them.
 OLD_LABELS_DIR = f"{REPO}/results/full_pipeline_eval/labels"
