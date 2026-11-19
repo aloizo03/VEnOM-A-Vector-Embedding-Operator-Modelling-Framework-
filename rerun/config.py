@@ -1,6 +1,6 @@
 import os
 
-ROOT = os.environ.get("VE_ROOT", "/various/aloizou")   
+ROOT = os.environ.get("VE_ROOT", "/various/aloizou")
 REPO = f"{ROOT}/Projects/Projects_updated/Vector_Embedding"
 DATA = f"{ROOT}/Results"
 
@@ -79,7 +79,7 @@ DATASETS = {
         "collections": {1000: "vectors_enzyms_VS1000_1773740476.0486188_1000"},
     },
     "mnist": {
-        "type": "image", "operators": ["mlp", "k_nearest_neighbors"],
+        "type": "image", "operators": ["cnn", "k_nearest_neighbors"],
         "lake": f"{DATA}/Image_Data/MNIST/mnist_train.csv",
         "queries": f"{DATA}/Image_Data/MNIST/mnist_test_venom.csv",
         "main_dim": 300,
@@ -88,7 +88,7 @@ DATASETS = {
                         100: "vectors_MNIST_VS100_1774618152.1422553_100"},
     },
     "fmnist": {
-        "type": "image", "operators": ["mlp", "k_nearest_neighbors"],
+        "type": "image", "operators": ["cnn", "k_nearest_neighbors"],
         "lake": f"{DATA}/Image_Data/f-MNIST/f-mnist_train.csv",
         "queries": f"{DATA}/Image_Data/f-MNIST/f-mnist_test_venom.csv",
         "main_dim": 300,
