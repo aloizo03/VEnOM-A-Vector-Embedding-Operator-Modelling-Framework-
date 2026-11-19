@@ -9,7 +9,7 @@ Apollo,source,https://github.com/giagiannis/data-profiler
 Apollo,modifications,none (default configuration)
 Apollo,sampling_ratio,0.1 and 0.2
 Framework,selection_ratio_lambda,0.2
-Framework,k,"max(1, ceil(lambda * |D|))"
+Framework,k,"Vector DB: max(1, ceil(lambda * |D|)); cosine/Euclidean: max(1, floor(lambda * |D|))"
 Framework,re-embedding_threshold_th,0.10
 Framework,runs_per_experiment,10
 NumTabData2Vec,training,"100 epochs, Adam, lr 0.001, batch size 4, 10% validation (checkpoint selection)"

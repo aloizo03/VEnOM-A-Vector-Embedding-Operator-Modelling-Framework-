@@ -281,7 +281,7 @@ class Data_selection:
                 data_dict_sorted = {k: v for k, v in sorted(data_dict.items(), key=lambda x: x[1], reverse=True)}
 
             datasets_filenames = list(data_dict_sorted.keys())
-            top_k = selection_k(ratio, len(datasets_filenames))
+            top_k = selection_k(ratio, len(datasets_filenames), rounding='floor')
             
             sel_dataset = datasets_filenames[:top_k]
             # vectors in the SAME order as sel_dataset: downstream code zips the two lists

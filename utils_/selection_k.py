@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def selection_k(ratio, n):
+def selection_k(ratio, n, rounding='ceil'):
     """Number of lake datasets to select for a selection ratio lambda.
 
     Single definition used by every selection path (Qdrant, Euclidean, cosine,
@@ -13,4 +13,8 @@ def selection_k(ratio, n):
         ratio = ratio / 100
     if n <= 0:
         return 0
-    return min(n, max(1, int(np.ceil(ratio * n))))
+    if rounding == 'floor':
+        k = int(np.floor(ratio * n))
+    else:
+        k = int(np.ceil(ratio * n))
+    return min(n, max(1, k))

@@ -15,7 +15,7 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-if os.environ.get("VE_RERUN_CONFIG"):  # alternative config (used for local smoke tests)
+if os.environ.get("VE_RERUN_CONFIG"):
     import importlib.util
     _spec = importlib.util.spec_from_file_location("config", os.environ["VE_RERUN_CONFIG"])
     C = importlib.util.module_from_spec(_spec)
@@ -64,7 +64,6 @@ class Runner:
             w.writerow([time.strftime("%F %T"), stage, tag, f"{seconds:.3f}", status, extra])
 
     def run(self, stage, tag, cmd, log_dir):
-        """Run a repo entry point; stdout/stderr -> <log_dir>/<tag>.log. Returns True on success."""
         if self.done(tag):
             return True
         os.makedirs(log_dir, exist_ok=True)
@@ -318,7 +317,6 @@ def opmodel(R, stage, ds, op, sel_pickle, tag):
 
 
 def stage_verify(R, datasets):
-    """Qdrant exact=True vs fixed hand-written Euclidean: same D_r, same errors per seed."""
     import pandas as pd
     from qdrant_client import models
     sys.path.insert(0, REPO)
@@ -348,7 +346,7 @@ def stage_verify(R, datasets):
         vdb = pickle.load(open(pk_vdb, "rb"))
         c = qclient()
         n = c.get_collection(coll).points_count
-        k = selection_k(C.LAMBDA, n)
+        k = selection_k(C.LAMBDA, n, rounding='floor')
         exact = {"selected_dataset": {}, "Pred_Dataset": dist["Pred_Dataset"]}
         same_names = same_vecs = same_vdb = 0
         for q, qv in dist["Pred_Dataset"].items():
