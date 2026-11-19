@@ -334,7 +334,6 @@ def stage_verify(R, datasets):
         if R.dry:
             continue
         if not (pk_dist and pk_vdb and coll):
-            # fail closed: a verification that could not run is not a pass
             ok_all = False
             rows.append({"dataset": ds, "operator": op, "dim": dim, "collection": coll, "PASS": False,
                          "note": "could not run: " + ", ".join(n for n, x in (("collection", coll), (
@@ -441,7 +440,6 @@ def stage_embedders(R, datasets):
 
 
 def pack(R):
-    """tar.gz of everything needed for rerun/make_report.py (no pickles / query caches)."""
     dest = R.out.rstrip("/") + f"_{platform.node()}_{time.strftime('%Y%m%d_%H%M')}.tar.gz"
     skip_dirs = {"query_cache", "_done"}
 
@@ -452,7 +450,7 @@ def pack(R):
         return ti
     with tarfile.open(dest, "w:gz") as tf:
         tf.add(R.out, arcname=os.path.basename(R.out.rstrip("/")), filter=keep)
-    print(f"Packed -> {dest} ({os.path.getsize(dest) / 1e6:.1f} MB). Send this file back.")
+    print(f"Results packed to -> {dest} ({os.path.getsize(dest) / 1e6:.1f} MB)")
 
 
 
@@ -472,9 +470,7 @@ def main():
     if a.pack:
         return pack(R)
     order = [d for d in C.DATASETS if d in a.datasets]
-    os.environ["VE_QUERY_CACHE"] = ""  # caching is passed explicitly per (dataset, embedder, dim)
-    # dataset names stored in the March collections point at a data root that has moved;
-    # inherited by every subprocess (utils_/path_remap.py)
+    os.environ["VE_QUERY_CACHE"] = ""
     os.environ["VE_PATH_REMAP"] = ";".join(f"{o}=>{n}" for o, n in getattr(C, "PATH_REMAP", {}).items())
     t_all = time.time()
     for st in [s for s in STAGES if s in a.stages]:
@@ -489,7 +485,7 @@ def main():
             if not stage_verify(R, order) and not R.dry and not a.continue_on_verify_fail:
                 R.log_time(st, "stage", time.time() - t0, "FAILED")
                 sys.exit("VERIFICATION FAILED: Qdrant exact and hand-written Euclidean differ "
-                         "(see verification.csv). Stopping as requested.")
+                         "(see verification.csv). Stopping!!")
         else:
             {"grid": stage_grid, "lambda": stage_lambda, "sr": stage_sr, "embedders": stage_embedders}[st](R, order)
         R.log_time(st, "stage", time.time() - t0, "done")

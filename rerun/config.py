@@ -23,7 +23,6 @@ METHODS = {
 NUM2VEC_CKPT = {d: f"{DATA}/NumTabData2Vec_Weights/Opt_adam_all_data_e100_v{d}/best.pt" for d in (100, 200, 300)}
 GRAPH_CKPT = f"{ROOT}/Projects/Projects_updated/Wavelet-Weights/1000-DIM/graph_vec_model_1000_dim.pkl"
 
-# Order = run order (HPC + Adult first, as requested).
 DATASETS = {
     "hpc": {
         "type": "tabular", "operators": ["linear_regression", "mlp_regression"],
@@ -49,7 +48,7 @@ DATASETS = {
     },
     "stock": {
         "type": "tabular", "operators": ["linear_regression", "mlp_regression"],
-        "lake": f"{DATA}/data/Stock/test", "queries": f"{DATA}/data/Stock/test_2",
+        "lake": f"{DATA}/data/Stock/test_", "queries": f"{DATA}/data/Stock/test_2",
         "main_dim": 300,
         "collections": {300: "vectors_STOCKS_VS300_1773662729.3367891_300",
                         200: "vectors_Stock_200V_1782377404.0813515_200",
