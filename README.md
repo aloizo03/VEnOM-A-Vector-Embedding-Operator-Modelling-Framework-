@@ -33,6 +33,7 @@ For graph:
 ```
 $ python train_graph2vec.py -i "/data/graphs_edgelist" --out "/results/graph_model" -e 10 -vec 256
 ```
+For WaveCharacteristic (the default `-a waveletchar`, used in the paper), the embedding size is determined by the model's own parameters and `-vec` is ignored; `-vec` only applies to Graph2Vec (`-a graph2vec`).
 
 </br>
 When the model is trained you can use the framework:
